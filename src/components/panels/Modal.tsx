@@ -13,7 +13,9 @@ export function Modal({
   children,
 }: {
   label: string
-  size: 'small' | 'large'
+  // At phone width, 'small' and 'large' cards fill the screen; an 'alert'
+  // (a yes/no question) stays a small centered card everywhere.
+  size: 'alert' | 'small' | 'large'
   focus?: string
   onClose: () => void
   children: ReactNode
@@ -48,8 +50,13 @@ export function Modal({
         if (pressedBackdrop.current && event.target === event.currentTarget) onClose()
       }}
       className={cx(
-        'm-auto max-h-[calc(100vh-2rem)] overflow-y-auto rounded-xl bg-white p-0 text-stone-900 shadow-2xl backdrop:bg-stone-900/30 focus:outline-none',
-        size === 'large' ? 'w-[min(56rem,calc(100vw-2rem))]' : 'w-[min(34rem,calc(100vw-2rem))]',
+        'm-auto max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-xl bg-white p-0 text-stone-900 shadow-2xl backdrop:bg-stone-900/30 focus:outline-none',
+        size === 'alert'
+          ? 'w-[min(28rem,calc(100vw-2rem))]'
+          : cx(
+              'max-md:h-dvh max-md:max-h-dvh max-md:w-full max-md:max-w-full max-md:rounded-none max-md:pt-[env(safe-area-inset-top)] max-md:pb-[env(safe-area-inset-bottom)]',
+              size === 'large' ? 'md:w-[min(56rem,calc(100vw-2rem))]' : 'md:w-[min(34rem,calc(100vw-2rem))]',
+            ),
       )}
     >
       {children}

@@ -9,7 +9,11 @@ export function Toast({ message, onDismiss }: { message: string; onDismiss: () =
   }, [message, onDismiss])
 
   return (
-    <div role="status" className="pointer-events-none fixed inset-x-0 bottom-4 flex justify-center">
+    // At phone width, above the tab bar and the home bar.
+    <div
+      role="status"
+      className="pointer-events-none fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] flex justify-center px-4 md:bottom-4"
+    >
       {message && (
         <p className="pointer-events-auto rounded-md bg-stone-900 px-4 py-2 text-sm text-white shadow-lg">
           {message}
