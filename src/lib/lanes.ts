@@ -106,6 +106,17 @@ function layoutChips(weekStart: ISODate, subtasks: readonly Subtask[]): ChipPlac
   return chips
 }
 
+// The band segment of `lane` covering column `col`, if any, with the chips
+// it has on that day.
+export function segmentAt(
+  lane: Lane,
+  col: number,
+): { segment: BandSegment; chips: ChipPlacement[] } | null {
+  const segment = lane.segments.find((s) => s.startCol <= col && col <= s.endCol)
+  if (!segment) return null
+  return { segment, chips: segment.chips.filter((c) => c.startCol <= col && col <= c.endCol) }
+}
+
 function overlaps(a: WeekPlacement, b: WeekPlacement): boolean {
   return a.startCol <= b.endCol && b.startCol <= a.endCol
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Project, Subtask } from '../types'
-import { layoutWeek, type Lane, type ProjectWithSubtasks } from './lanes'
+import { layoutWeek, segmentAt, type Lane, type ProjectWithSubtasks } from './lanes'
 
 type Task = [title: string, start: string, end?: string]
 
@@ -110,6 +110,16 @@ describe('layoutWeek', () => {
     const [lane] = layoutWeek('2026-11-01', [busy])
     expect(chips(lane)).toEqual(['Edit 3-5 r0', 'Color 4-4 r1', 'Music 5-5 r1', 'Thumbnail 6-6 r0'])
     expect(lane.rowCount).toBe(2)
+  })
+
+  it('finds the band and the tasks on a given day, including days with no task', () => {
+    const [lane] = layoutWeek('2026-11-08', [morning])
+    // Nov 9: inside the band, no task.
+    expect(segmentAt(lane, 1)).toMatchObject({ segment: { project: { id: 'morning' } }, chips: [] })
+    // Nov 11: Thumbnail.
+    expect(segmentAt(lane, 3)?.chips.map((c) => c.subtask.title)).toEqual(['Thumbnail'])
+    // Week of Nov 15: after the publish date, no band at all.
+    expect(layoutWeek('2026-11-15', [morning])).toEqual([])
   })
 
   it('splits a range that crosses into the next week', () => {
