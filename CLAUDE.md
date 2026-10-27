@@ -11,6 +11,7 @@ The full spec is in @SPEC.md and is the source of truth. Read it before writing 
 - Start by proposing a plan for the milestones below, list your open questions, and wait for my go-ahead.
 - Initialize a git repo and commit at the end of each milestone, then pause so I can try the app before you continue.
 - Ask before adding any dependency not listed under Stack.
+- Record every manual test (anything not part of `npm test`, done by hand or with a throwaway browser or API script) in `docs/testing/manual-tests.md`: what was checked, where, how, and the result, including failures and what was done about them. Log tests the user reports too.
 
 ## Milestones (whole MVP, in this order)
 
@@ -48,7 +49,24 @@ The full spec is in @SPEC.md and is the source of truth. Read it before writing 
 
 ## Out of scope for the MVP
 
-Do not build any of these: Instagram or YouTube API integration, accounts or cloud sync, notifications, file attachments, time-of-day scheduling, or recurring projects.
+Do not build any of these: Instagram or YouTube API integration, notifications, file attachments, time-of-day scheduling, or recurring projects. (Sign-in and sync came after the MVP; see below.)
+
+## Sign-in and sync (added after the MVP)
+
+The plan and its decisions are in `docs/plans/supabase-sync.md`.
+
+- **Local-first.** Screens read and write only the device's Dexie database, as before. Signed out, that's the guest database. Signed in, it's a separate database per account, which `src/data/sync.ts` keeps in step with Supabase (Postgres in São Paulo) and Realtime.
+- **Every write goes through `writing()`** in `src/data/db.ts`. In an account space, Dexie hooks record each change in the `pending` table within the same transaction. Don't write to the tables any other way, and never use `clear()`, which skips the hooks.
+- **Governance:** four independent locks keep strangers out:
+  1. Google sign-in stays in Testing mode;
+  2. Supabase sign-ups are off;
+  3. every database rule requires the email to be in `allowed_emails`;
+  4. row-level security limits each user to their own rows.
+
+  Never weaken one to make another work.
+- **Database changes are SQL migrations** in `supabase/migrations/`, reviewed in a PR. `npm run test:db` checks the access rules against a local Postgres.
+- **Keys:** the app only ever uses the publishable key. The service-role key never goes in the app, the repo or `.env.local`.
+- **Configuration:** builds without `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` (see `.env.example`) run signed-out only.
 
 ## Phone layout (added after the MVP)
 
@@ -57,10 +75,11 @@ Below 768px wide (`PHONE_QUERY` in `src/hooks/useMediaQuery.ts`, Tailwind `max-m
 ## Commands
 
 - `npm run dev`: dev server at http://localhost:5173
-- `npm run dev:phone`: the same, reachable from a phone on the same Wi-Fi (open the Network address it prints)
+- `npm run dev:phone`: the same, reachable from a phone on the same Wi-Fi at http://luiss-macbook-air.local:5173 (the Mac's network name, allowed in `vite.config.ts`). For Google sign-in to return there, that address must be in the dev Supabase project's Redirect URLs. Over plain HTTP the sign-in falls back to a weaker code check (a console warning); the HTTPS live site doesn't.
 - `npm run build`: typecheck, then production build into `dist/`
 - `npm run typecheck`: TypeScript only (`tsc -b`)
 - `npm test`: Vitest, once; `npm run test:watch` to rerun on save. Tests run in `America/Los_Angeles` so UTC date-parsing bugs fail, and use fake-indexeddb, so data-layer tests need no browser.
 - `npm run lint`: Oxlint
+- `npm run test:db`: applies `supabase/migrations` to a throwaway local Postgres and runs the access-rule tests (needs a Postgres server, e.g. `brew install postgresql@17`, or `PG_BIN`)
 - Pull requests: `.github/workflows/ci.yml` runs the tests, lint and build on every PR. Branch protection on `main` requires that check ("Tests, lint and build") to pass before merging.
 - Deploy: push to `main`. `.github/workflows/deploy.yml` runs the tests, lint and build, then publishes `dist/` to https://lhckb.github.io/content-tracker/. The build uses relative asset paths (`base: './'`), so it works under that sub-path.

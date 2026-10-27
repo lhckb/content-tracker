@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { restoreProject, type TrackerData } from '../data'
+import { restoreProject, useAccount, type TrackerData } from '../data'
 import { projectHex } from '../lib/colors'
 import { formatShortDate } from '../lib/dates'
 import { hasOverdue } from '../lib/overdue'
@@ -23,6 +23,7 @@ export function Sidebar({
   className?: string
 }) {
   const [archiveOpen, setArchiveOpen] = useState(false)
+  const signedOut = useAccount().state === 'signed-out'
   const subtasksByProject = groupByProject(data?.subtasks ?? [])
   const projects = data?.projects ?? []
   const active = projects.filter((p) => !p.archived).sort(byPublishDate)
@@ -45,6 +46,7 @@ export function Sidebar({
         <p className="text-sm text-stone-500">
           No active projects yet. Use <span className="font-medium">+ New project</span> to plan
           your next video.
+          {signedOut && ' Or sign in to bring in the projects from your other devices.'}
         </p>
       )}
       <ul className="flex flex-col gap-2">

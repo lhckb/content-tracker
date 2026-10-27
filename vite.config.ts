@@ -10,6 +10,14 @@ export default defineConfig({
   // no client-side routes, so nothing needs an absolute base.
   base: './',
   plugins: [react(), tailwindcss()],
+  server: {
+    // npm run dev:phone: lets a phone on the same Wi-Fi open the dev server
+    // by the Mac's network name (e.g. http://luiss-macbook-air.local:5173),
+    // which, unlike its IP, stays the same, so it can be listed once in the
+    // dev Supabase project's Redirect URLs. Vite refuses unknown names
+    // otherwise.
+    allowedHosts: ['.local'],
+  },
   test: {
     setupFiles: ['src/test/setup.ts'],
     // West of UTC, where parsing 'YYYY-MM-DD' as UTC midnight lands on the

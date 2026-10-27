@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { CalendarView } from './components/calendar/CalendarView'
 import { ConfirmHost } from './components/ConfirmHost'
 import { Panels, type Panel } from './components/panels/Panels'
@@ -6,8 +6,15 @@ import { Sidebar } from './components/Sidebar'
 import { TabBar, type Tab } from './components/TabBar'
 import { Toast } from './components/Toast'
 import { cx } from './components/cx'
+import { ask } from './components/ask'
 import { TopBar } from './components/TopBar'
-import { useTrackerData } from './data'
+import {
+  answerGuestCopyOffer,
+  guestCopyOffer,
+  startupSignInError,
+  useAccount,
+  useTrackerData,
+} from './data'
 import { useToday } from './hooks/useToday'
 
 function App() {
@@ -16,8 +23,31 @@ function App() {
   const [panel, setPanel] = useState<Panel | null>(null)
   // Which half shows at phone width; wider screens show both side by side.
   const [tab, setTab] = useState<Tab>('calendar')
-  const [notice, setNotice] = useState('')
+  // A Google sign-in that came back refused says why.
+  const [notice, setNotice] = useState(startupSignInError ?? '')
   const dismissNotice = useCallback(() => setNotice(''), [])
+  const account = useAccount()
+  const signedInAs = account.state === 'signed-in' ? account.userId : null
+
+  // Just signed in on a device with projects made while signed out: offer,
+  // once, to add them to the account.
+  useEffect(() => {
+    if (!signedInAs) return
+    let current = true
+    void guestCopyOffer().then(async (count) => {
+      if (!current || count === 0) return
+      const them = count === 1 ? 'it' : 'them'
+      const copy = await ask(
+        `This device has ${count} ${count === 1 ? 'project' : 'projects'} made while signed out. Add ${them} to your account?`,
+        { confirmLabel: 'Add to account' },
+      )
+      const copied = await answerGuestCopyOffer(copy)
+      if (copied) setNotice(`Added ${copied} ${copied === 1 ? 'project' : 'projects'} to your account.`)
+    })
+    return () => {
+      current = false
+    }
+  }, [signedInAs])
   const openProject = useCallback((id: string) => setPanel({ kind: 'project', id }), [])
   const openSubtask = useCallback((id: string) => setPanel({ kind: 'subtask', id }), [])
 

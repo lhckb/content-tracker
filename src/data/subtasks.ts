@@ -1,6 +1,6 @@
 import { isPublish, lastDay, normalizeRange } from '../lib/subtasks'
 import type { DateRange, ISODate, Project, Subtask } from '../types'
-import { db } from './db'
+import { db, writing } from './db'
 import {
   newSubtask,
   requireProject,
@@ -37,10 +37,7 @@ export async function addSubtask(
   options: GuardRailOptions = {},
 ): Promise<AddSubtaskResult> {
   const range = normalizeRange(input.start, input.end)
-  return db.transaction(
-    'rw',
-    db.projects,
-    db.subtasks,
+  return writing(
     async (): Promise<AddSubtaskResult> => {
       const project = await requireProject(projectId)
       const refusal = await applyGuardRail(project, range, options)
@@ -64,10 +61,7 @@ export async function moveSubtask(
   options: GuardRailOptions = {},
 ): Promise<MoveSubtaskResult> {
   const range = normalizeRange(dates.start, dates.end)
-  return db.transaction(
-    'rw',
-    db.projects,
-    db.subtasks,
+  return writing(
     async (): Promise<MoveSubtaskResult> => {
       const subtask = await requireSubtask(id)
       if (isPublish(subtask)) {
@@ -90,7 +84,7 @@ export type SubtaskPatch = Partial<Pick<Subtask, 'title' | 'notes' | 'done'>>
 // subtask of the project and progress reaches 100%. Unticking Publish
 // leaves the others as they are.
 export async function updateSubtask(id: string, patch: SubtaskPatch): Promise<void> {
-  await db.transaction('rw', db.subtasks, async () => {
+  await writing(async () => {
     const subtask = await requireSubtask(id)
     if (patch.title !== undefined && isPublish(subtask)) {
       throw new Error("The Publish subtask can't be renamed")
@@ -103,7 +97,7 @@ export async function updateSubtask(id: string, patch: SubtaskPatch): Promise<vo
 }
 
 export async function deleteSubtask(id: string): Promise<void> {
-  await db.transaction('rw', db.subtasks, async () => {
+  await writing(async () => {
     const subtask = await requireSubtask(id)
     if (isPublish(subtask)) throw new Error("The Publish subtask can't be deleted")
     await db.subtasks.delete(id)

@@ -1,3 +1,4 @@
+import { AccountButton } from './AccountButton'
 import { AppMenu } from './AppMenu'
 
 export function TopBar({
@@ -21,6 +22,7 @@ export function TopBar({
         >
           + <span className="max-md:sr-only">New project</span>
         </button>
+        <AccountButton onNotice={onNotice} />
         <AppMenu hasData={hasData} onNotice={onNotice} />
       </div>
     </header>
