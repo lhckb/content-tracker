@@ -95,11 +95,13 @@ export function CalendarView({
 
   return (
     <section aria-label="Calendar" className="flex flex-col gap-3">
-      <div className="flex items-center gap-1">
+      {/* When a phone is too narrow for it all, the view toggle wraps to its
+          own row rather than the title breaking. */}
+      <div className="flex flex-wrap items-center gap-x-1 gap-y-2">
         <NavButton label={`Previous ${mode}`} onClick={() => step(-1)}>
           ‹
         </NavButton>
-        <h2 className="text-center text-base font-semibold md:min-w-48 md:text-lg">
+        <h2 className="text-center text-base font-semibold whitespace-nowrap md:min-w-48 md:text-lg">
           {mode === 'month' ? formatMonth(month) : formatWeek(week)}
         </h2>
         <NavButton label={`Next ${mode}`} onClick={() => step(1)}>
