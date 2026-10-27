@@ -42,6 +42,13 @@ export function addDaysISO(value: ISODate, days: number): ISODate {
   return toISODate(addDays(parseISO(value), days))
 }
 
+// Every day from `start` to `end` (or just `start`), both inclusive.
+export function daysInRange(start: ISODate, end: ISODate = start): ISODate[] {
+  const days: ISODate[] = []
+  for (let day = start; day <= end; day = addDaysISO(day, 1)) days.push(day)
+  return days
+}
+
 // Whole days from `from` to `to`; negative when `to` is earlier.
 export function daysBetween(from: ISODate, to: ISODate): number {
   return differenceInCalendarDays(parseISO(to), parseISO(from))

@@ -15,7 +15,7 @@ import { isOverdue } from '../../lib/overdue'
 import { isPublish } from '../../lib/subtasks'
 import type { ISODate, Project, Subtask } from '../../types'
 import { cx } from '../cx'
-import type { ChipDragData } from './useChipDrag'
+import { stopDragStart, type ChipDragData } from './useChipDrag'
 
 // Month packs a whole month of short chips; week gives one week room for
 // full titles, the project name and a done checkbox on each chip.
@@ -254,8 +254,7 @@ function Chip({
             aria-label={`${subtask.title} done`}
             checked={subtask.done}
             onChange={(event) => actions.onToggleDone(subtask, project, event.target.checked)}
-            // Pressing the checkbox shouldn't start a drag.
-            onPointerDown={(event) => event.stopPropagation()}
+            {...stopDragStart}
             className="mt-0.5 size-3.5 shrink-0"
           />
           <button

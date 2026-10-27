@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   addDaysISO,
+  daysInRange,
   daysBetween,
   formatDateRange,
   isISODate,
@@ -31,6 +32,16 @@ describe('dates', () => {
     expect(addDaysISO('2026-10-31', 1)).toBe('2026-11-01')
     expect(addDaysISO('2026-11-01', 1)).toBe('2026-11-02')
     expect(addDaysISO('2026-03-01', -1)).toBe('2026-02-28')
+  })
+
+  it('lists the days of a range', () => {
+    expect(daysInRange('2026-10-30', '2026-11-02')).toEqual([
+      '2026-10-30',
+      '2026-10-31',
+      '2026-11-01',
+      '2026-11-02',
+    ])
+    expect(daysInRange('2026-11-05')).toEqual(['2026-11-05'])
   })
 
   it('counts whole days between dates', () => {

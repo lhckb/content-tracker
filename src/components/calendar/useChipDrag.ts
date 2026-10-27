@@ -6,12 +6,19 @@ import {
   type DndContextProps,
   type DragStartEvent,
 } from '@dnd-kit/core'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type SyntheticEvent } from 'react'
 import type { TrackerData } from '../../data'
 import { draggedRange, sameRange, type DragMode, type DragPreview } from '../../lib/drag'
 import { isPublish } from '../../lib/subtasks'
 import type { ISODate, Subtask } from '../../types'
 import { movePublishDate, moveTask } from '../actions'
+
+// Spread on a control inside a draggable chip (a checkbox), so pressing it
+// doesn't start dragging the chip around it.
+export const stopDragStart = {
+  onMouseDown: (event: SyntheticEvent) => event.stopPropagation(),
+  onTouchStart: (event: SyntheticEvent) => event.stopPropagation(),
+}
 
 // What each draggable part of a chip (its body or an edge) carries.
 export interface ChipDragData {
