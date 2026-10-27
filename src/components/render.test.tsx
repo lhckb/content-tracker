@@ -10,6 +10,7 @@ import { Sidebar } from './Sidebar'
 // out like the spec's mockup when today is Thursday, Nov 5, 2026.
 const TODAY = '2026-11-05'
 let data: TrackerData
+const NO_OPENERS = { onOpenProject: () => {}, onOpenSubtask: () => {} }
 
 beforeAll(async () => {
   await loadSampleData(TODAY)
@@ -26,7 +27,7 @@ function chipLabels(html: string, projectTitle: string): string[] {
 }
 
 describe('MonthView', () => {
-  const html = () => render(<MonthView data={data} today={TODAY} />)
+  const html = () => render(<MonthView data={data} today={TODAY} {...NO_OPENERS} />)
 
   it('shows the month with today marked', () => {
     expect(html()).toContain('November 2026')
@@ -38,7 +39,7 @@ describe('MonthView', () => {
       'Script, Nov 2, done',
       'A-roll, Nov 3, done',
       'B-roll, Nov 4, done',
-      'Edit, Nov 5 – Nov 6',
+      'Edit, Nov 5–6',
       'Thumbnail, Nov 11',
       'Publish, Nov 14',
     ])
@@ -60,7 +61,7 @@ describe('MonthView', () => {
 })
 
 describe('Sidebar', () => {
-  const html = () => render(<Sidebar data={data} today={TODAY} />)
+  const html = () => render(<Sidebar data={data} today={TODAY} onOpenProject={() => {}} />)
 
   it('lists active projects by publish date with their progress', () => {
     const titles = ['Gym Reel: leg day', 'Morning routine vlog', 'Desk setup tour']

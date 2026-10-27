@@ -11,9 +11,14 @@ import {
 import type { ProjectWithSubtasks } from '../../lib/lanes'
 import { groupByProject } from '../../lib/subtasks'
 import type { ISODate } from '../../types'
-import { WeekRow } from './WeekRow'
+import { WeekRow, type Openers } from './WeekRow'
 
-export function MonthView({ data, today }: { data: TrackerData | undefined; today: ISODate }) {
+export function MonthView({
+  data,
+  today,
+  onOpenProject,
+  onOpenSubtask,
+}: { data: TrackerData | undefined; today: ISODate } & Openers) {
   const [month, setMonth] = useState(() => monthOf(today))
 
   const items = useMemo((): ProjectWithSubtasks[] => {
@@ -61,6 +66,8 @@ export function MonthView({ data, today }: { data: TrackerData | undefined; toda
             month={month}
             today={today}
             items={items}
+            onOpenProject={onOpenProject}
+            onOpenSubtask={onOpenSubtask}
           />
         ))}
       </div>

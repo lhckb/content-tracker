@@ -19,12 +19,14 @@ export function WeekRow({
   month,
   today,
   items,
+  onOpenProject,
+  onOpenSubtask,
 }: {
   weekStart: ISODate
   month: ISODate
   today: ISODate
   items: ProjectWithSubtasks[]
-}) {
+} & Openers) {
   const lanes = useMemo(() => layoutWeek(weekStart, items), [weekStart, items])
 
   return (
@@ -54,14 +56,31 @@ export function WeekRow({
 
       <div className="relative flex flex-col gap-1 pt-7 pb-2">
         {lanes.map((lane, i) => (
-          <LaneRow key={i} lane={lane} today={today} />
+          <LaneRow
+            key={i}
+            lane={lane}
+            today={today}
+            onOpenProject={onOpenProject}
+            onOpenSubtask={onOpenSubtask}
+          />
         ))}
       </div>
     </div>
   )
 }
 
-function LaneRow({ lane, today }: { lane: Lane; today: ISODate }) {
+// What clicking does: a chip opens its subtask, the band its project.
+export interface Openers {
+  onOpenProject: (projectId: string) => void
+  onOpenSubtask: (subtaskId: string) => void
+}
+
+function LaneRow({
+  lane,
+  today,
+  onOpenProject,
+  onOpenSubtask,
+}: { lane: Lane; today: ISODate } & Openers) {
   return (
     <div
       className="grid grid-cols-7 gap-y-0.5"
@@ -70,7 +89,9 @@ function LaneRow({ lane, today }: { lane: Lane; today: ISODate }) {
       {lane.segments.map((segment) => (
         <Fragment key={segment.project.id}>
           <div
-            className={edges(segment, 'band')}
+            title={`Open ${segment.project.title}`}
+            onClick={() => onOpenProject(segment.project.id)}
+            className={cx(edges(segment, 'band'), 'cursor-pointer')}
             style={{
               gridColumn: columns(segment),
               gridRow: '1 / -1',
@@ -78,7 +99,13 @@ function LaneRow({ lane, today }: { lane: Lane; today: ISODate }) {
             }}
           />
           {segment.chips.map((chip) => (
-            <Chip key={chip.subtask.id} chip={chip} project={segment.project} today={today} />
+            <Chip
+              key={chip.subtask.id}
+              chip={chip}
+              project={segment.project}
+              today={today}
+              onOpen={() => onOpenSubtask(chip.subtask.id)}
+            />
           ))}
         </Fragment>
       ))}
@@ -90,10 +117,12 @@ function Chip({
   chip,
   project,
   today,
+  onOpen,
 }: {
   chip: ChipPlacement
   project: Project
   today: ISODate
+  onOpen: () => void
 }) {
   const { subtask } = chip
   const hex = projectHex(project)
@@ -105,12 +134,14 @@ function Chip({
   }`
 
   return (
-    <div
+    <button
+      type="button"
       title={detail}
       aria-label={detail}
+      onClick={onOpen}
       className={cx(
         edges(chip, 'chip'),
-        'flex min-w-0 items-center border px-1.5 text-xs text-stone-800',
+        'flex min-w-0 items-center border px-1.5 text-left text-xs text-stone-800 hover:brightness-95',
         subtask.kind === 'publish' && 'font-semibold',
         subtask.done && 'opacity-50',
         overdue && 'border-red-600 ring-1 ring-red-600',
@@ -123,7 +154,7 @@ function Chip({
       }}
     >
       <span className="truncate">{label}</span>
-    </div>
+    </button>
   )
 }
 

@@ -4,6 +4,7 @@ import {
   daysBetween,
   formatDateRange,
   isISODate,
+  isPlausibleDate,
   parseISODate,
   toISODate,
 } from './dates'
@@ -39,6 +40,13 @@ describe('dates', () => {
 
   it('formats a day or a range', () => {
     expect(formatDateRange('2026-11-14')).toBe('Nov 14')
-    expect(formatDateRange('2026-11-05', '2026-11-06')).toBe('Nov 5 – Nov 6')
+    expect(formatDateRange('2026-11-05', '2026-11-06')).toBe('Nov 5–6')
+    expect(formatDateRange('2026-10-30', '2026-11-02')).toBe('Oct 30 – Nov 2')
+  })
+
+  it('skips the half-typed years a date input reports along the way', () => {
+    expect(isPlausibleDate('0002-11-14')).toBe(false)
+    expect(isPlausibleDate('0202-11-14')).toBe(false)
+    expect(isPlausibleDate('2026-11-14')).toBe(true)
   })
 })

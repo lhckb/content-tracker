@@ -9,6 +9,10 @@ export function isPublish(subtask: Pick<Subtask, 'kind'>): boolean {
   return subtask.kind === 'publish'
 }
 
+export function includesDay(range: DateRange, day: ISODate): boolean {
+  return range.start <= day && day <= lastDay(range)
+}
+
 // Validates a start/end pair and drops an end that is empty or equal to the
 // start, so a one-day subtask is always stored without one.
 export function normalizeRange(start: ISODate, end?: ISODate): DateRange {

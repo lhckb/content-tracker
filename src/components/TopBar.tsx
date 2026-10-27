@@ -2,9 +2,11 @@ import { AppMenu } from './AppMenu'
 
 export function TopBar({
   hasData,
+  onNewProject,
   onNotice,
 }: {
   hasData: boolean
+  onNewProject: () => void
   onNotice: (message: string) => void
 }) {
   return (
@@ -13,9 +15,8 @@ export function TopBar({
       <div className="flex items-center gap-2">
         <button
           type="button"
-          disabled
-          title="The new-project dialog arrives in milestone 3"
-          className="rounded-md border border-blue-500 bg-blue-50 px-3 py-1.5 text-sm font-medium text-blue-900 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+          onClick={onNewProject}
+          className="rounded-md border border-blue-500 bg-blue-50 px-3 py-1.5 text-sm font-medium text-blue-900 hover:bg-blue-100"
         >
           + New project
         </button>

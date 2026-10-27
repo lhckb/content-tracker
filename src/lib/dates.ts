@@ -47,13 +47,29 @@ export function daysBetween(from: ISODate, to: ISODate): number {
   return differenceInCalendarDays(parseISO(to), parseISO(from))
 }
 
+// A date someone could mean. Date inputs report every keystroke, so typing
+// a year passes through 0002, 0020 and 0202 on the way to 2026.
+export function isPlausibleDate(value: unknown): value is ISODate {
+  if (!isISODate(value)) return false
+  const year = Number(value.slice(0, 4))
+  return year >= 1970 && year <= 2200
+}
+
 // 'Nov 14'
 export function formatShortDate(value: ISODate): string {
   return format(parseISO(value), 'MMM d')
 }
 
-// 'Nov 14', or 'Nov 5 – Nov 6' for a range.
+// 'Sat, Nov 14, 2026'
+export function formatLongDate(value: ISODate): string {
+  return format(parseISO(value), 'EEE, MMM d, yyyy')
+}
+
+// 'Nov 14'; a range is 'Nov 5–6' within a month, 'Oct 30 – Nov 2' across.
 export function formatDateRange(start: ISODate, end?: ISODate): string {
   if (!end) return formatShortDate(start)
+  if (start.slice(0, 7) === end.slice(0, 7)) {
+    return `${formatShortDate(start)}–${format(parseISO(end), 'd')}`
+  }
   return `${formatShortDate(start)} – ${formatShortDate(end)}`
 }

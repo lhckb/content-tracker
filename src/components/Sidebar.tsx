@@ -10,7 +10,15 @@ import type { ISODate, Project, Subtask } from '../types'
 import { PlatformIcon } from './PlatformIcon'
 import { ProgressBar } from './ProgressBar'
 
-export function Sidebar({ data, today }: { data: TrackerData | undefined; today: ISODate }) {
+export function Sidebar({
+  data,
+  today,
+  onOpenProject,
+}: {
+  data: TrackerData | undefined
+  today: ISODate
+  onOpenProject: (projectId: string) => void
+}) {
   const [archiveOpen, setArchiveOpen] = useState(false)
   const subtasksByProject = groupByProject(data?.subtasks ?? [])
   const projects = data?.projects ?? []
@@ -33,6 +41,7 @@ export function Sidebar({ data, today }: { data: TrackerData | undefined; today:
               project={project}
               subtasks={subtasksByProject.get(project.id) ?? []}
               today={today}
+              onOpen={() => onOpenProject(project.id)}
             />
           </li>
         ))}
@@ -52,24 +61,28 @@ export function Sidebar({ data, today }: { data: TrackerData | undefined; today:
           {archiveOpen && (
             <ul className="mt-2 flex flex-col gap-1">
               {archived.map((project) => (
-                <li
-                  key={project.id}
-                  className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-stone-500 hover:bg-stone-50"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate">{project.title}</p>
-                    <p className="text-xs text-stone-400">
-                      {PLATFORM_LABELS[project.platform]} · published{' '}
-                      {formatShortDate(project.publishDate)}
-                    </p>
+                <li key={project.id} className="rounded-md px-2 py-1.5 text-sm hover:bg-stone-50">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      title="Open this project"
+                      onClick={() => onOpenProject(project.id)}
+                      className="min-w-0 flex-1 truncate text-left text-stone-600 hover:underline"
+                    >
+                      {project.title}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void restoreProject(project.id)}
+                      className="shrink-0 rounded border border-stone-300 px-2 py-0.5 text-xs text-stone-600 hover:bg-white"
+                    >
+                      Restore
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => void restoreProject(project.id)}
-                    className="rounded border border-stone-300 px-2 py-0.5 text-xs text-stone-600 hover:bg-white"
-                  >
-                    Restore
-                  </button>
+                  <p className="truncate text-xs text-stone-400">
+                    {PLATFORM_LABELS[project.platform]} · published{' '}
+                    {formatShortDate(project.publishDate)}
+                  </p>
                 </li>
               ))}
             </ul>
@@ -84,18 +97,24 @@ function ProjectCard({
   project,
   subtasks,
   today,
+  onOpen,
 }: {
   project: Project
   subtasks: Subtask[]
   today: ISODate
+  onOpen: () => void
 }) {
   const progress = getProgress(subtasks)
   const color = projectHex(project)
   return (
-    <div className="relative overflow-hidden rounded-lg border border-stone-200 bg-white py-2.5 pr-3 pl-4 shadow-xs">
+    <button
+      type="button"
+      onClick={onOpen}
+      className="relative block w-full overflow-hidden rounded-lg border border-stone-200 bg-white py-2.5 pr-3 pl-4 text-left shadow-xs hover:border-stone-300 hover:shadow-sm"
+    >
       <span className="absolute inset-y-0 left-0 w-1" style={{ background: color }} />
-      <div className="flex items-start justify-between gap-2">
-        <h3 className="text-sm leading-snug font-semibold">{project.title}</h3>
+      <span className="flex items-start justify-between gap-2">
+        <span className="text-sm leading-snug font-semibold">{project.title}</span>
         {hasOverdue(project, subtasks, today) && (
           <span
             role="img"
@@ -104,16 +123,16 @@ function ProjectCard({
             className="mt-1.5 size-2 shrink-0 rounded-full bg-red-600"
           />
         )}
-      </div>
-      <p className="mt-0.5 flex items-center gap-1 text-xs text-stone-500">
+      </span>
+      <span className="mt-0.5 flex items-center gap-1 text-xs text-stone-500">
         <PlatformIcon platform={project.platform} className="size-3.5 shrink-0" />
         {PLATFORM_LABELS[project.platform]} · publish {formatShortDate(project.publishDate)}
-      </p>
-      <div className="mt-2 flex items-center gap-2">
+      </span>
+      <span className="mt-2 flex items-center gap-2">
         <ProgressBar percent={progress.percent} color={color} />
         <span className="w-9 text-right text-xs font-medium tabular-nums">{progress.percent}%</span>
-      </div>
-    </div>
+      </span>
+    </button>
   )
 }
 
