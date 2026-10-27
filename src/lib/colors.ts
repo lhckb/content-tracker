@@ -25,6 +25,9 @@ export const COLOR_HEX: Record<ColorId, string> = {
 
 export const ARCHIVED_HEX = '#a8a29e'
 
+// Overdue tasks are marked in red, which no project color uses.
+export const OVERDUE_HEX = '#dc2626'
+
 // Archived projects are drawn in gray whatever their color.
 export function projectHex(project: Pick<Project, 'color' | 'archived'>): string {
   return project.archived ? ARCHIVED_HEX : COLOR_HEX[project.color]
