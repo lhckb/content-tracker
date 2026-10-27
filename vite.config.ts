@@ -5,6 +5,10 @@ import { defineConfig } from 'vite'
 
 // https://vite.dev/config/
 export default defineConfig({
+  // Relative asset paths, so the build works wherever it's served from:
+  // GitHub Pages puts it under /content-tracker/. The app has one page and
+  // no client-side routes, so nothing needs an absolute base.
+  base: './',
   plugins: [react(), tailwindcss()],
   test: {
     setupFiles: ['src/test/setup.ts'],

@@ -57,3 +57,4 @@ Do not build any of these: Instagram or YouTube API integration, accounts or clo
 - `npm run typecheck`: TypeScript only (`tsc -b`)
 - `npm test`: Vitest, once; `npm run test:watch` to rerun on save. Tests run in `America/Los_Angeles` so UTC date-parsing bugs fail, and use fake-indexeddb, so data-layer tests need no browser.
 - `npm run lint`: Oxlint
+- Deploy: push to `main`. `.github/workflows/deploy.yml` runs the tests, lint and build, then publishes `dist/` to https://lhckb.github.io/content-tracker/. The build uses relative asset paths (`base: './'`), so it works under that sub-path.
