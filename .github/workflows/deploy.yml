@@ -31,6 +31,12 @@ jobs:
       - run: npm test
       - run: npm run lint
       - run: npm run build
+        env:
+          # The Supabase project for sign-in and sync. Public by design (see
+          # src/data/supabase.ts); set as repository variables. Without
+          # them the site runs signed-out only.
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
       - uses: actions/upload-pages-artifact@v5
         with:
           path: dist
