@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from 'react'
 import { backupFileName, clearAllData, exportBackupText, importBackupText } from '../data'
 import { loadSampleData } from '../dev/sampleData'
+import { ask } from './ask'
 import { cx } from './cx'
 
 // The "⋯" menu in the top bar: backup export/import, plus sample data and
@@ -39,15 +40,20 @@ export function AppMenu({
     )
   }
 
-  function confirmReplace(): boolean {
-    return !hasData || confirm('This replaces every project currently stored. Continue?')
+  async function confirmReplace(): Promise<boolean> {
+    if (!hasData) return true
+    return ask('This replaces every project currently stored. Continue?', {
+      confirmLabel: 'Replace',
+      danger: true,
+    })
   }
 
   function onFileChosen(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
     event.target.value = ''
-    if (!file || !confirmReplace()) return
+    if (!file) return
     run(async () => {
+      if (!(await confirmReplace())) return ''
       const counts = await importBackupText(await file.text())
       return `Imported ${plural(counts.projects, 'project')}.`
     })
@@ -75,8 +81,11 @@ export function AppMenu({
       {open && (
         <div
           role="menu"
-          className="absolute top-full right-0 z-30 mt-1 w-52 rounded-md border border-stone-200 bg-white py-1 shadow-lg"
+          className="absolute top-full right-0 z-30 mt-1 w-60 rounded-md border border-stone-200 bg-white py-1 shadow-lg"
         >
+          <p className="px-3 pt-1.5 pb-2 text-xs leading-snug text-stone-500">
+            Projects are saved in this browser only. Export a backup now and then.
+          </p>
           <MenuItem
             onClick={() =>
               run(async () => {
@@ -100,25 +109,29 @@ export function AppMenu({
               <div className="my-1 border-t border-stone-100" />
               <p className="px-3 pt-1 text-xs text-stone-400">Development</p>
               <MenuItem
-                onClick={() => {
-                  if (!confirmReplace()) return
+                onClick={() =>
                   run(async () => {
+                    if (!(await confirmReplace())) return ''
                     await loadSampleData()
                     return 'Loaded sample data.'
                   })
-                }}
+                }
               >
                 Load sample data
               </MenuItem>
               <MenuItem
                 danger
-                onClick={() => {
-                  if (!confirm('Delete every project?')) return
+                onClick={() =>
                   run(async () => {
+                    const sure = await ask('Delete every project? This can\'t be undone.', {
+                      confirmLabel: 'Delete everything',
+                      danger: true,
+                    })
+                    if (!sure) return ''
                     await clearAllData()
                     return 'Cleared all data.'
                   })
-                }}
+                }
               >
                 Clear all data
               </MenuItem>

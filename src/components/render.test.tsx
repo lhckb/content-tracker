@@ -3,7 +3,7 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { getTrackerData, type TrackerData } from '../data'
 import { ARCHIVED_HEX } from '../lib/colors'
 import { loadSampleData } from '../dev/sampleData'
-import { MonthView } from './calendar/MonthView'
+import { CalendarView } from './calendar/CalendarView'
 import { Sidebar } from './Sidebar'
 
 // Renders the real components to HTML from the sample data, which is laid
@@ -26,8 +26,15 @@ function chipLabels(html: string, projectTitle: string): string[] {
   return [...html.matchAll(pattern)].map((m) => m[1])
 }
 
-describe('MonthView', () => {
-  const html = () => render(<MonthView data={data} today={TODAY} {...NO_OPENERS} />)
+// The opening tag of the chip with this label, whatever its attribute order.
+function chipTag(html: string, label: string): string {
+  const tag = html.match(new RegExp(`<button[^>]*aria-label="${label}"[^>]*>`))
+  if (!tag) throw new Error(`No chip labelled ${label}`)
+  return tag[0]
+}
+
+describe('CalendarView', () => {
+  const html = () => render(<CalendarView data={data} today={TODAY} {...NO_OPENERS} />)
 
   it('shows the month with today marked', () => {
     expect(html()).toContain('November 2026')
@@ -48,15 +55,14 @@ describe('MonthView', () => {
   })
 
   it('outlines overdue chips in red', () => {
-    expect(html()).toMatch(
-      /aria-label="Gym Reel: leg day: B-roll, Nov 4, overdue" class="[^"]*border-red-600/,
-    )
+    expect(chipTag(html(), 'Gym Reel: leg day: B-roll, Nov 4, overdue')).toContain('border-red-600')
     expect(html().match(/border-red-600/g)).toHaveLength(1)
   })
 
   it('draws archived projects in gray', () => {
-    const chip = html().match(/aria-label="Coffee grinder review: Publish, Nov 1, done"[^>]*>/)
-    expect(chip?.[0]).toContain(`border-color:${ARCHIVED_HEX}`)
+    expect(chipTag(html(), 'Coffee grinder review: Publish, Nov 1, done')).toContain(
+      `border-color:${ARCHIVED_HEX}`,
+    )
   })
 })
 

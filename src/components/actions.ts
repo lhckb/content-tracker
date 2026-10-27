@@ -9,23 +9,24 @@ import {
 import { formatShortDate } from '../lib/dates'
 import { isPublish } from '../lib/subtasks'
 import type { DateRange, ISODate, Project, Subtask } from '../types'
+import { ask } from './ask'
 
 // The steps that need to ask the person something, shared by the cards and
-// (later) the calendar's drag and drop.
+// the calendar's drag and drop.
 
 // Moves a task, offering to push the publish date out if the new dates end
 // after it. Resolves false when the person declines and nothing changed.
 export async function moveTask(task: Subtask, dates: DateRange): Promise<boolean> {
   const result = await moveSubtask(task.id, dates)
   if (result.ok) return true
-  if (!confirmPush(task.title, result.endsOn, result.publishDate)) return false
+  if (!(await confirmPush(task.title, result.endsOn, result.publishDate))) return false
   return (await moveSubtask(task.id, dates, { pushPublishDate: true })).ok
 }
 
 export async function addTask(projectId: string, input: NewSubtask): Promise<boolean> {
   const result = await addSubtask(projectId, input)
   if (result.ok) return true
-  if (!confirmPush(input.title.trim(), result.endsOn, result.publishDate)) return false
+  if (!(await confirmPush(input.title.trim(), result.endsOn, result.publishDate))) return false
   return (await addSubtask(projectId, input, { pushPublishDate: true })).ok
 }
 
@@ -44,16 +45,19 @@ export async function movePublishDate(projectId: string, date: ISODate): Promise
 export async function setDone(subtask: Subtask, project: Project, done: boolean): Promise<boolean> {
   await updateSubtask(subtask.id, { done })
   if (!done || !isPublish(subtask) || project.archived) return false
-  if (!confirm(`"${project.title}" is published and all its subtasks are done. Archive the project?`)) {
-    return false
-  }
+  const archive = await ask(
+    `"${project.title}" is published and all its subtasks are done. Archive the project?`,
+    { confirmLabel: 'Archive' },
+  )
+  if (!archive) return false
   await archiveProject(project.id)
   return true
 }
 
-function confirmPush(title: string, endsOn: ISODate, publishDate: ISODate): boolean {
-  return confirm(
+function confirmPush(title: string, endsOn: ISODate, publishDate: ISODate): Promise<boolean> {
+  return ask(
     `"${title}" would end on ${formatShortDate(endsOn)}, after the publish date (${formatShortDate(publishDate)}).\n\nPush the publish date to ${formatShortDate(endsOn)}?`,
+    { confirmLabel: 'Push publish date' },
   )
 }
 

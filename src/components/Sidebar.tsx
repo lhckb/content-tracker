@@ -32,7 +32,10 @@ export function Sidebar({
     <aside className="flex w-60 shrink-0 flex-col gap-3 overflow-y-auto border-r border-stone-200 bg-white p-4">
       <h2 className="text-sm font-medium text-stone-500">Active projects</h2>
       {data && active.length === 0 && (
-        <p className="text-sm text-stone-400">No active projects yet.</p>
+        <p className="text-sm text-stone-500">
+          No active projects yet. Use <span className="font-medium">+ New project</span> to plan
+          your next video.
+        </p>
       )}
       <ul className="flex flex-col gap-2">
         {active.map((project) => (

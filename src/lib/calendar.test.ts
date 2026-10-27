@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { addMonthsISO, formatMonth, monthOf, weeksOfMonth } from './calendar'
+import { addMonthsISO, formatMonth, formatWeek, monthOf, weekOf, weeksOfMonth } from './calendar'
 
 describe('weeksOfMonth', () => {
   it('starts every row on a Sunday and covers the whole month', () => {
@@ -19,6 +19,20 @@ describe('weeksOfMonth', () => {
     expect(weeksOfMonth('2026-02-01')).toHaveLength(4)
     // Aug 2026 starts on a Saturday and ends on a Monday: six rows.
     expect(weeksOfMonth('2026-08-01')).toHaveLength(6)
+  })
+})
+
+describe('weeks', () => {
+  it('finds the Sunday a date belongs to', () => {
+    expect(weekOf('2026-10-27')).toBe('2026-10-25')
+    expect(weekOf('2026-10-25')).toBe('2026-10-25')
+    expect(weekOf('2026-10-31')).toBe('2026-10-25')
+  })
+
+  it('names a week, spelling out months and years only when they change', () => {
+    expect(formatWeek('2026-10-25')).toBe('Oct 25 – 31, 2026')
+    expect(formatWeek('2026-11-29')).toBe('Nov 29 – Dec 5, 2026')
+    expect(formatWeek('2026-12-27')).toBe('Dec 27, 2026 – Jan 2, 2027')
   })
 })
 

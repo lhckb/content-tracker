@@ -3,17 +3,18 @@ import { cx } from '../cx'
 
 // A card over the calendar, built on <dialog> for focus handling and Escape.
 // Clicking the dimmed backdrop closes it. Focus starts on the card itself,
-// so a stray keypress can't edit the first field, unless `focusFirstField`.
+// so a stray keypress can't edit the first field, unless `focus` names the
+// element to start on (a CSS selector).
 export function Modal({
   label,
   size,
-  focusFirstField = false,
+  focus,
   onClose,
   children,
 }: {
   label: string
   size: 'small' | 'large'
-  focusFirstField?: boolean
+  focus?: string
   onClose: () => void
   children: ReactNode
 }) {
@@ -26,10 +27,10 @@ export function Modal({
     const dialog = ref.current
     if (dialog && !dialog.open) dialog.showModal()
     // showModal() focuses the first focusable element, which is often ✕.
-    if (focusFirstField) dialog?.querySelector<HTMLElement>('input, textarea, select')?.focus()
-    else dialog?.focus()
+    const target = focus ? dialog?.querySelector<HTMLElement>(focus) : dialog
+    target?.focus()
     return () => dialog?.close()
-  }, [focusFirstField])
+  }, [focus])
 
   return (
     <dialog

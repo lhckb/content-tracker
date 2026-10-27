@@ -1,5 +1,5 @@
 import { useDraggable } from '@dnd-kit/core'
-import { Fragment, useMemo } from 'react'
+import { Fragment, useMemo, type ReactNode } from 'react'
 import { dayOfMonth, daysOfWeek, isSameMonth } from '../../lib/calendar'
 import { projectHex, tint } from '../../lib/colors'
 import { daysBetween, formatDateRange } from '../../lib/dates'
@@ -13,35 +13,54 @@ import {
 } from '../../lib/lanes'
 import { isOverdue } from '../../lib/overdue'
 import { isPublish } from '../../lib/subtasks'
-import type { ISODate, Project } from '../../types'
+import type { ISODate, Project, Subtask } from '../../types'
 import { cx } from '../cx'
 import type { ChipDragData } from './useChipDrag'
 
+// Month packs a whole month of short chips; week gives one week room for
+// full titles, the project name and a done checkbox on each chip.
+export type CalendarMode = 'month' | 'week'
+
+// What clicking does: a chip opens its subtask, the band its project.
+export interface CalendarActions {
+  onOpenProject: (projectId: string) => void
+  onOpenSubtask: (subtaskId: string) => void
+  onToggleDone: (subtask: Subtask, project: Project, done: boolean) => void
+}
+
 // One Sunday-to-Saturday row: day cells behind, project lanes on top.
 export function WeekRow({
+  mode,
   weekStart,
   month,
   today,
   items,
   liftedId,
-  onOpenProject,
-  onOpenSubtask,
+  actions,
 }: {
+  mode: CalendarMode
   weekStart: ISODate
-  month: ISODate
+  // The month on screen, whose days are drawn brighter. Null in week view.
+  month: ISODate | null
   today: ISODate
   items: ProjectWithSubtasks[]
   // The subtask being dragged, drawn raised.
   liftedId: string | null
-} & Openers) {
+  actions: CalendarActions
+}) {
   const lanes = useMemo(() => layoutWeek(weekStart, items), [weekStart, items])
 
   return (
-    <div className="relative min-h-28 border-b border-stone-200 last:border-b-0">
+    <div
+      className={cx(
+        'relative border-b border-stone-200 last:border-b-0',
+        mode === 'month' ? 'min-h-28' : 'min-h-[32rem]',
+      )}
+    >
       <div className="absolute inset-0 grid grid-cols-7">
         {daysOfWeek(weekStart).map((day, i) => {
           const isToday = day === today
-          const inMonth = isSameMonth(day, month)
+          const dimmed = month !== null && !isSameMonth(day, month)
           return (
             <div
               key={day}
@@ -50,29 +69,34 @@ export function WeekRow({
               className={cx(
                 'px-2 py-1 text-xs',
                 i > 0 && 'border-l border-stone-200',
-                isToday ? 'bg-stone-100' : !inMonth && 'bg-stone-50',
-                inMonth ? 'text-stone-600' : 'text-stone-400',
+                isToday ? 'bg-stone-100' : dimmed && 'bg-stone-50',
+                dimmed ? 'text-stone-400' : 'text-stone-600',
               )}
             >
-              <span className={cx(isToday && 'font-semibold text-stone-900')}>
-                {dayOfMonth(day)}
-              </span>
-              {isToday && <span className="ml-1.5 font-semibold text-stone-900">Today</span>}
+              {/* Week view names its days in the header row instead. */}
+              {mode === 'month' && (
+                <>
+                  <span className={cx(isToday && 'font-semibold text-stone-900')}>
+                    {dayOfMonth(day)}
+                  </span>
+                  {isToday && <span className="ml-1.5 font-semibold text-stone-900">Today</span>}
+                </>
+              )}
             </div>
           )
         })}
       </div>
 
-      <div className="relative flex flex-col gap-1 pt-7 pb-2">
+      <div className={cx('relative flex flex-col pb-2', mode === 'month' ? 'gap-1 pt-7' : 'gap-2 pt-2')}>
         {lanes.map((lane, i) => (
           <LaneRow
             key={i}
+            mode={mode}
             lane={lane}
             weekStart={weekStart}
             today={today}
             liftedId={liftedId}
-            onOpenProject={onOpenProject}
-            onOpenSubtask={onOpenSubtask}
+            actions={actions}
           />
         ))}
       </div>
@@ -80,30 +104,36 @@ export function WeekRow({
   )
 }
 
-// What clicking does: a chip opens its subtask, the band its project.
-export interface Openers {
-  onOpenProject: (projectId: string) => void
-  onOpenSubtask: (subtaskId: string) => void
-}
-
 function LaneRow({
+  mode,
   lane,
   weekStart,
   today,
   liftedId,
-  onOpenProject,
-  onOpenSubtask,
-}: { lane: Lane; weekStart: ISODate; today: ISODate; liftedId: string | null } & Openers) {
+  actions,
+}: {
+  mode: CalendarMode
+  lane: Lane
+  weekStart: ISODate
+  today: ISODate
+  liftedId: string | null
+  actions: CalendarActions
+}) {
   return (
     <div
       className="grid grid-cols-7 gap-y-0.5"
-      style={{ gridTemplateRows: `repeat(${lane.rowCount}, 1.5rem)` }}
+      style={{
+        gridTemplateRows:
+          mode === 'month'
+            ? `repeat(${lane.rowCount}, 1.5rem)`
+            : `repeat(${lane.rowCount}, minmax(2.75rem, auto))`,
+      }}
     >
       {lane.segments.map((segment) => (
         <Fragment key={segment.project.id}>
           <div
             title={`Open ${segment.project.title}`}
-            onClick={() => onOpenProject(segment.project.id)}
+            onClick={() => actions.onOpenProject(segment.project.id)}
             className={cx(edges(segment, 'band'), 'cursor-pointer')}
             style={{
               gridColumn: columns(segment),
@@ -114,12 +144,13 @@ function LaneRow({
           {segment.chips.map((chip) => (
             <Chip
               key={chip.subtask.id}
+              mode={mode}
               chip={chip}
               project={segment.project}
               weekStart={weekStart}
               today={today}
               lifted={chip.subtask.id === liftedId}
-              onOpen={() => onOpenSubtask(chip.subtask.id)}
+              actions={actions}
             />
           ))}
         </Fragment>
@@ -129,19 +160,21 @@ function LaneRow({
 }
 
 function Chip({
+  mode,
   chip,
   project,
   weekStart,
   today,
   lifted,
-  onOpen,
+  actions,
 }: {
+  mode: CalendarMode
   chip: ChipPlacement
   project: Project
   weekStart: ISODate
   today: ISODate
   lifted: boolean
-  onOpen: () => void
+  actions: CalendarActions
 }) {
   const { subtask } = chip
   // Archived projects stay put; Publish moves but is always one day.
@@ -158,42 +191,92 @@ function Chip({
   const hex = projectHex(project)
   const overdue = !project.archived && isOverdue(subtask, today)
   const days = subtask.end ? daysBetween(subtask.start, subtask.end) + 1 : 1
-  const label = `${subtask.title}${days > 1 ? ` · ${days} days` : ''}${subtask.done ? ' ✓' : ''}`
+  const length = days > 1 ? ` · ${days} days` : ''
   const detail = `${project.title}: ${subtask.title}, ${formatDateRange(subtask.start, subtask.end)}${
     subtask.done ? ', done' : overdue ? ', overdue' : ''
   }`
+  const open = () => actions.onOpenSubtask(subtask.id)
 
-  return (
-    <button
-      ref={setNodeRef}
-      {...listeners}
-      type="button"
-      title={detail}
-      aria-label={detail}
-      onClick={onOpen}
-      className={cx(
-        edges(chip, 'chip'),
-        'relative flex min-w-0 items-center border px-1.5 text-left text-xs text-stone-800 hover:brightness-95',
-        subtask.kind === 'publish' && 'font-semibold',
-        subtask.done && 'opacity-50',
-        overdue && 'border-red-600 ring-1 ring-red-600',
-        lifted && 'z-10 shadow-md ring-2 ring-stone-800/40',
-      )}
-      style={{
-        gridColumn: columns(chip),
-        gridRow: chip.row + 1,
-        background: tint(hex, 35),
-        borderColor: overdue ? undefined : hex,
-      }}
-    >
+  const handles = (content: ReactNode) => (
+    <>
       {resizable && !chip.continuesBefore && (
         <ResizeHandle subtaskId={subtask.id} weekStart={weekStart} mode="resize-start" />
       )}
-      <span className="truncate">{label}</span>
+      {content}
       {resizable && !chip.continuesAfter && (
         <ResizeHandle subtaskId={subtask.id} weekStart={weekStart} mode="resize-end" />
       )}
-    </button>
+    </>
+  )
+
+  const shared = {
+    ref: setNodeRef,
+    ...listeners,
+    className: cx(
+      edges(chip, 'chip'),
+      'relative flex min-w-0 border text-left text-xs text-stone-800',
+      subtask.kind === 'publish' && 'font-semibold',
+      overdue && 'border-red-600 ring-1 ring-red-600',
+      lifted && 'z-10 shadow-md ring-2 ring-stone-800/40',
+    ),
+    style: {
+      gridColumn: columns(chip),
+      gridRow: chip.row + 1,
+      background: tint(hex, 35),
+      borderColor: overdue ? undefined : hex,
+    },
+  }
+
+  if (mode === 'month') {
+    return (
+      <button
+        {...shared}
+        type="button"
+        title={detail}
+        aria-label={detail}
+        onClick={open}
+        className={cx(shared.className, 'items-center px-1.5 hover:brightness-95', subtask.done && 'opacity-50')}
+      >
+        {handles(<span className="truncate">{`${subtask.title}${length}${subtask.done ? ' ✓' : ''}`}</span>)}
+      </button>
+    )
+  }
+
+  // Week view: a checkbox and a button side by side, since a checkbox can't
+  // sit inside a button. The chip itself is the drag handle.
+  return (
+    <div {...shared} className={cx(shared.className, 'items-start gap-1.5 px-2 py-1.5')}>
+      {handles(
+        <>
+          <input
+            type="checkbox"
+            aria-label={`${subtask.title} done`}
+            checked={subtask.done}
+            onChange={(event) => actions.onToggleDone(subtask, project, event.target.checked)}
+            // Pressing the checkbox shouldn't start a drag.
+            onPointerDown={(event) => event.stopPropagation()}
+            className="mt-0.5 size-3.5 shrink-0"
+          />
+          <button
+            type="button"
+            title={detail}
+            aria-label={detail}
+            onClick={open}
+            className={cx('min-w-0 flex-1 text-left', subtask.done && 'opacity-50')}
+          >
+            <span className={cx('block leading-snug', subtask.done && 'line-through')}>
+              {subtask.title}
+            </span>
+            {/* "Overdue" first, so a narrow column cuts the project name instead. */}
+            <span className="block truncate text-[11px] font-normal text-stone-600">
+              {overdue && <span className="font-medium text-red-700">Overdue · </span>}
+              {project.title}
+              {length}
+            </span>
+          </button>
+        </>,
+      )}
+    </div>
   )
 }
 
@@ -218,7 +301,7 @@ function ResizeHandle({
       {...listeners}
       aria-hidden="true"
       className={cx(
-        'absolute inset-y-0 w-2 cursor-ew-resize hover:bg-stone-900/15',
+        'absolute inset-y-0 z-10 w-2 cursor-ew-resize hover:bg-stone-900/15',
         mode === 'resize-start' ? 'left-0 rounded-l' : 'right-0 rounded-r',
       )}
     />

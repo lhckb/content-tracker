@@ -16,6 +16,7 @@ import { getProgress } from '../../lib/progress'
 import { includesDay, isPublish, sortSubtasks } from '../../lib/subtasks'
 import type { ISODate, Project, Subtask } from '../../types'
 import { addTask, movePublishDate, setDone } from '../actions'
+import { ask } from '../ask'
 import { cx } from '../cx'
 import { ProgressBar } from '../ProgressBar'
 import { DateField } from './DateField'
@@ -78,7 +79,11 @@ export function ProjectDetail({
 
   async function remove() {
     const count = subtasks.length
-    if (!confirm(`Delete "${project.title}" and its ${count} subtasks? This can't be undone.`)) return
+    const sure = await ask(`Delete "${project.title}" and its ${count} subtasks? This can't be undone.`, {
+      confirmLabel: 'Delete project',
+      danger: true,
+    })
+    if (!sure) return
     await deleteProject(project.id)
     onNotice(`Deleted "${project.title}".`)
     onClose()

@@ -1,4 +1,12 @@
-import { addMonths, endOfMonth, endOfWeek, format, startOfMonth, startOfWeek } from 'date-fns'
+import {
+  addDays,
+  addMonths,
+  endOfMonth,
+  endOfWeek,
+  format,
+  startOfMonth,
+  startOfWeek,
+} from 'date-fns'
 import type { ISODate } from '../types'
 import { addDaysISO, parseISODate, toISODate } from './dates'
 
@@ -41,4 +49,22 @@ export function weeksOfMonth(month: ISODate): ISODate[] {
 
 export function daysOfWeek(weekStart: ISODate): ISODate[] {
   return Array.from({ length: 7 }, (_, i) => addDaysISO(weekStart, i))
+}
+
+// The Sunday starting the week that contains `date`.
+export function weekOf(date: ISODate): ISODate {
+  return toISODate(startOfWeek(parseISODate(date), WEEK_OPTIONS))
+}
+
+// 'Oct 25 – 31, 2026', 'Oct 29 – Nov 4, 2026', 'Dec 27, 2026 – Jan 2, 2027'
+export function formatWeek(weekStart: ISODate): string {
+  const start = parseISODate(weekStart)
+  const end = addDays(start, 6)
+  if (start.getFullYear() !== end.getFullYear()) {
+    return `${format(start, 'MMM d, yyyy')} – ${format(end, 'MMM d, yyyy')}`
+  }
+  if (start.getMonth() !== end.getMonth()) {
+    return `${format(start, 'MMM d')} – ${format(end, 'MMM d, yyyy')}`
+  }
+  return `${format(start, 'MMM d')} – ${format(end, 'd, yyyy')}`
 }

@@ -6,6 +6,7 @@ import { addDaysISO, daysBetween } from '../../lib/dates'
 import { isPublish } from '../../lib/subtasks'
 import type { ISODate, Project, Subtask } from '../../types'
 import { movePublishDate, moveTask, setDone } from '../actions'
+import { ask } from '../ask'
 import { DateField } from './DateField'
 import { CloseButton } from './Modal'
 
@@ -69,7 +70,7 @@ export function SubtaskCard({
   }
 
   async function remove() {
-    if (!confirm(`Delete "${subtask.title}"?`)) return
+    if (!(await ask(`Delete "${subtask.title}"?`, { confirmLabel: 'Delete', danger: true }))) return
     await deleteSubtask(subtask.id)
     onBack()
   }

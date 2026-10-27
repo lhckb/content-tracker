@@ -29,7 +29,7 @@ export function Panels({
 
   if (panel.kind === 'new-project') {
     return (
-      <Modal key="new-project" label="New project" size="small" focusFirstField onClose={close}>
+      <Modal key="new-project" label="New project" size="small" focus="input" onClose={close}>
         <NewProjectDialog
           onCancel={close}
           onCreated={(id) => onNavigate({ kind: 'project', id })}

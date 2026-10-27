@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react'
-import { MonthView } from './components/calendar/MonthView'
+import { CalendarView } from './components/calendar/CalendarView'
+import { ConfirmHost } from './components/ConfirmHost'
 import { Panels, type Panel } from './components/panels/Panels'
 import { Sidebar } from './components/Sidebar'
 import { Toast } from './components/Toast'
@@ -26,7 +27,7 @@ function App() {
       <div className="flex min-h-0 flex-1">
         <Sidebar data={data} today={today} onOpenProject={openProject} />
         <main className="min-w-0 flex-1 overflow-auto p-4">
-          <MonthView
+          <CalendarView
             data={data}
             today={today}
             onOpenProject={openProject}
@@ -44,6 +45,7 @@ function App() {
           onNotice={setNotice}
         />
       )}
+      <ConfirmHost />
       <Toast message={notice} onDismiss={dismissNotice} />
     </div>
   )

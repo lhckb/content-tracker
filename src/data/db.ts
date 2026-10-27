@@ -12,3 +12,13 @@ db.version(1).stores({
   projects: 'id',
   subtasks: 'id, projectId',
 })
+
+// Asks the browser not to clear this database when disk space runs low.
+// Browsers may decline (Firefox asks the person); the app works either way.
+export async function requestPersistentStorage(): Promise<boolean> {
+  try {
+    return (await navigator.storage?.persist?.()) ?? false
+  } catch {
+    return false
+  }
+}

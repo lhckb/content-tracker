@@ -4,7 +4,7 @@ import { shiftRange } from '../lib/shift'
 import { sortSubtasks, tasksEndingAfter } from '../lib/subtasks'
 import { defaultTasks, PUBLISH_TITLE } from '../lib/template'
 import type { ColorId, ISODate, Platform, Project, Subtask } from '../types'
-import { db } from './db'
+import { db, requestPersistentStorage } from './db'
 import {
   activeColors,
   newSubtask,
@@ -24,6 +24,8 @@ export interface NewProject {
 // without the default ones.
 export async function createProject(input: NewProject): Promise<string> {
   assertISODate(input.publishDate)
+  // Now there's something worth keeping, ask the browser to hold on to it.
+  void requestPersistentStorage()
   return db.transaction('rw', db.projects, db.subtasks, async () => {
     const project: Project = {
       id: crypto.randomUUID(),
