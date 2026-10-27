@@ -4,3 +4,16 @@ body {
   @apply bg-stone-50 text-stone-900 antialiased;
   color-scheme: light;
 }
+
+/* While a chip is dragged: one cursor everywhere, and no text selection. */
+html[data-dragging='move'],
+html[data-dragging='move'] * {
+  cursor: grabbing !important;
+  user-select: none;
+}
+
+html[data-dragging='resize'],
+html[data-dragging='resize'] * {
+  cursor: ew-resize !important;
+  user-select: none;
+}

@@ -10,7 +10,7 @@ import { Sidebar } from './Sidebar'
 // out like the spec's mockup when today is Thursday, Nov 5, 2026.
 const TODAY = '2026-11-05'
 let data: TrackerData
-const NO_OPENERS = { onOpenProject: () => {}, onOpenSubtask: () => {} }
+const NO_OPENERS = { onOpenProject: () => {}, onOpenSubtask: () => {}, onNotice: () => {} }
 
 beforeAll(async () => {
   await loadSampleData(TODAY)

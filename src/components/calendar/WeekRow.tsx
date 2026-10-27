@@ -1,7 +1,9 @@
+import { useDraggable } from '@dnd-kit/core'
 import { Fragment, useMemo } from 'react'
 import { dayOfMonth, daysOfWeek, isSameMonth } from '../../lib/calendar'
 import { projectHex, tint } from '../../lib/colors'
 import { daysBetween, formatDateRange } from '../../lib/dates'
+import type { DragMode } from '../../lib/drag'
 import {
   layoutWeek,
   type ChipPlacement,
@@ -10,8 +12,10 @@ import {
   type WeekPlacement,
 } from '../../lib/lanes'
 import { isOverdue } from '../../lib/overdue'
+import { isPublish } from '../../lib/subtasks'
 import type { ISODate, Project } from '../../types'
 import { cx } from '../cx'
+import type { ChipDragData } from './useChipDrag'
 
 // One Sunday-to-Saturday row: day cells behind, project lanes on top.
 export function WeekRow({
@@ -19,6 +23,7 @@ export function WeekRow({
   month,
   today,
   items,
+  liftedId,
   onOpenProject,
   onOpenSubtask,
 }: {
@@ -26,6 +31,8 @@ export function WeekRow({
   month: ISODate
   today: ISODate
   items: ProjectWithSubtasks[]
+  // The subtask being dragged, drawn raised.
+  liftedId: string | null
 } & Openers) {
   const lanes = useMemo(() => layoutWeek(weekStart, items), [weekStart, items])
 
@@ -38,6 +45,8 @@ export function WeekRow({
           return (
             <div
               key={day}
+              // Drop target lookup: see dayAt in useChipDrag.
+              data-day={day}
               className={cx(
                 'px-2 py-1 text-xs',
                 i > 0 && 'border-l border-stone-200',
@@ -59,7 +68,9 @@ export function WeekRow({
           <LaneRow
             key={i}
             lane={lane}
+            weekStart={weekStart}
             today={today}
+            liftedId={liftedId}
             onOpenProject={onOpenProject}
             onOpenSubtask={onOpenSubtask}
           />
@@ -77,10 +88,12 @@ export interface Openers {
 
 function LaneRow({
   lane,
+  weekStart,
   today,
+  liftedId,
   onOpenProject,
   onOpenSubtask,
-}: { lane: Lane; today: ISODate } & Openers) {
+}: { lane: Lane; weekStart: ISODate; today: ISODate; liftedId: string | null } & Openers) {
   return (
     <div
       className="grid grid-cols-7 gap-y-0.5"
@@ -103,7 +116,9 @@ function LaneRow({
               key={chip.subtask.id}
               chip={chip}
               project={segment.project}
+              weekStart={weekStart}
               today={today}
+              lifted={chip.subtask.id === liftedId}
               onOpen={() => onOpenSubtask(chip.subtask.id)}
             />
           ))}
@@ -116,15 +131,30 @@ function LaneRow({
 function Chip({
   chip,
   project,
+  weekStart,
   today,
+  lifted,
   onOpen,
 }: {
   chip: ChipPlacement
   project: Project
+  weekStart: ISODate
   today: ISODate
+  lifted: boolean
   onOpen: () => void
 }) {
   const { subtask } = chip
+  // Archived projects stay put; Publish moves but is always one day.
+  const movable = !project.archived
+  const resizable = movable && !isPublish(subtask)
+  // A range crossing into the next week is drawn once per week row, so the
+  // ids include the week to stay unique.
+  const { setNodeRef, listeners } = useDraggable({
+    id: `move:${subtask.id}:${weekStart}`,
+    data: { subtaskId: subtask.id, mode: 'move' } satisfies ChipDragData,
+    disabled: !movable,
+  })
+
   const hex = projectHex(project)
   const overdue = !project.archived && isOverdue(subtask, today)
   const days = subtask.end ? daysBetween(subtask.start, subtask.end) + 1 : 1
@@ -135,16 +165,19 @@ function Chip({
 
   return (
     <button
+      ref={setNodeRef}
+      {...listeners}
       type="button"
       title={detail}
       aria-label={detail}
       onClick={onOpen}
       className={cx(
         edges(chip, 'chip'),
-        'flex min-w-0 items-center border px-1.5 text-left text-xs text-stone-800 hover:brightness-95',
+        'relative flex min-w-0 items-center border px-1.5 text-left text-xs text-stone-800 hover:brightness-95',
         subtask.kind === 'publish' && 'font-semibold',
         subtask.done && 'opacity-50',
         overdue && 'border-red-600 ring-1 ring-red-600',
+        lifted && 'z-10 shadow-md ring-2 ring-stone-800/40',
       )}
       style={{
         gridColumn: columns(chip),
@@ -153,8 +186,42 @@ function Chip({
         borderColor: overdue ? undefined : hex,
       }}
     >
+      {resizable && !chip.continuesBefore && (
+        <ResizeHandle subtaskId={subtask.id} weekStart={weekStart} mode="resize-start" />
+      )}
       <span className="truncate">{label}</span>
+      {resizable && !chip.continuesAfter && (
+        <ResizeHandle subtaskId={subtask.id} weekStart={weekStart} mode="resize-end" />
+      )}
     </button>
+  )
+}
+
+// A strip along one end of a chip that drags just that end. It sits inside
+// the chip, and dnd-kit lets the innermost draggable claim the press.
+function ResizeHandle({
+  subtaskId,
+  weekStart,
+  mode,
+}: {
+  subtaskId: string
+  weekStart: ISODate
+  mode: Exclude<DragMode, 'move'>
+}) {
+  const { setNodeRef, listeners } = useDraggable({
+    id: `${mode}:${subtaskId}:${weekStart}`,
+    data: { subtaskId, mode } satisfies ChipDragData,
+  })
+  return (
+    <span
+      ref={setNodeRef}
+      {...listeners}
+      aria-hidden="true"
+      className={cx(
+        'absolute inset-y-0 w-2 cursor-ew-resize hover:bg-stone-900/15',
+        mode === 'resize-start' ? 'left-0 rounded-l' : 'right-0 rounded-r',
+      )}
+    />
   )
 }
 

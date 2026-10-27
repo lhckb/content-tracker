@@ -31,6 +31,7 @@ function App() {
             today={today}
             onOpenProject={openProject}
             onOpenSubtask={openSubtask}
+            onNotice={setNotice}
           />
         </main>
       </div>
