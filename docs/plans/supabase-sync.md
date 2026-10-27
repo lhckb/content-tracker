@@ -1,6 +1,6 @@
 # Plan: sign-in and sync with Supabase
 
-Status: approved, in progress · 2026-10-27
+Status: built and in review · 2026-10-27. The live-site checks follow the merge (T-12 onwards in `docs/testing/manual-tests.md`).
 
 ## Goals
 

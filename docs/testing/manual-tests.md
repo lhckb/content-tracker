@@ -5,6 +5,7 @@ Every check that isn't part of `npm test`, whether done by hand or with a throwa
 **Where:**
 - the local dev server, on http://localhost:5179 for automated runs and http://localhost:5173 for yours;
 - the dev Supabase project `content-tracker-dev` (`ldfzwpxcckxqywmdqnnx`, São Paulo);
+- the production Supabase project `content-tracker` (`uwfyzskkiowvaugqcgrq`, São Paulo), checked from outside only, since it has no test user;
 - the live site, https://lhckb.github.io/content-tracker/.
 
 **Tools:**
@@ -19,6 +20,33 @@ The scripts were throwaway and not committed; their steps are written out below.
 ---
 
 ## Branch `supabase-sync`: sign-in and sync (2026-10-27)
+
+### T-11 · Production project setup, through the public API · ✅ except sign-ups
+- **Where:** the production project, with the publishable key only and signed out. Production has no test user, so nothing here signs in.
+- **How:** a Node script.
+  1. Read `/auth/v1/settings`. The sign-up probe from T-07 only runs if sign-ups report as off, so nothing is ever created.
+  2. Signed out, read `projects`, `subtasks` and `allowed_emails`, and call `sync_push` with empty lists. `42501` means the migration ran and its permissions hold. "Not found" (`PGRST205` or `PGRST202`) would mean it didn't run.
+  3. Start a Google sign-in at `/auth/v1/authorize` and read the redirect without following it.
+  4. Open the Google page it points to, without choosing an account. As a control, open the same page with a made-up callback address.
+- **Result:**
+
+  | Check | Result |
+  | --- | --- |
+  | Sign-in providers on | ✅ google only (Email is off) |
+  | Sign-ups disabled | ❌ `false`: sign-ups are still on. The sign-up probe was skipped. Waiting for you to turn them off; re-check below. |
+  | Signed out: read `projects`, `subtasks`, `allowed_emails` | ✅ all refused (`42501` permission denied) |
+  | Signed out: call `sync_push` | ✅ refused (`42501`) |
+  | Google sign-in start | ✅ 302 to Google, same client ID as dev, callback `https://uwfyzskkiowvaugqcgrq.supabase.co/auth/v1/callback` |
+  | Google accepts that callback | ✅ Google's normal sign-in page. The made-up callback got `redirect_uri_mismatch`, which shows the check would catch a missing one. |
+
+- **Can't be checked from outside:**
+  - that your email is on the allowlist;
+  - that your user exists;
+  - the Redirect URLs list (Supabase no longer puts the return address in a readable form);
+  - live updates.
+
+  Your first sign-in on the live site covers all four (T-12 onwards).
+- **Also done:** set the repository variables `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` to the production values (`gh variable set`). Only the deploy on `main` reads them.
 
 ### T-10 · Data isolation between two real accounts · ✅
 - **Where:** dev Supabase project. By then it held data from both the test user and your Gmail account (from T-09).
