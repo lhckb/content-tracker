@@ -5,6 +5,7 @@ export * from './projects'
 export * from './subtasks'
 export * from './queries'
 export * from './hooks'
+export { copyGuestProjects, countGuestProjects } from './guest'
 export {
   backupFileName,
   BackupError,

@@ -4,7 +4,7 @@ import { shiftRange } from '../lib/shift'
 import { sortSubtasks, tasksEndingAfter } from '../lib/subtasks'
 import { defaultTasks, PUBLISH_TITLE } from '../lib/template'
 import type { ColorId, ISODate, Platform, Project, Subtask } from '../types'
-import { db, requestPersistentStorage } from './db'
+import { db, requestPersistentStorage, writing } from './db'
 import { newId } from './ids'
 import {
   activeColors,
@@ -27,7 +27,7 @@ export async function createProject(input: NewProject): Promise<string> {
   assertISODate(input.publishDate)
   // Now there's something worth keeping, ask the browser to hold on to it.
   void requestPersistentStorage()
-  return db.transaction('rw', db.projects, db.subtasks, async () => {
+  return writing(async () => {
     const project: Project = {
       id: newId(),
       title: input.title.trim(),
@@ -55,7 +55,7 @@ export async function createProject(input: NewProject): Promise<string> {
 export type ProjectPatch = Partial<Pick<Project, 'title' | 'platform' | 'notes'>>
 
 export async function updateProject(id: string, patch: ProjectPatch): Promise<void> {
-  await db.projects.update(id, patch)
+  await writing(() => db.projects.update(id, patch))
 }
 
 export type SetColorResult = { ok: true } | { ok: false; reason: 'color-taken' }
@@ -63,7 +63,7 @@ export type SetColorResult = { ok: true } | { ok: false; reason: 'color-taken' }
 // Refuses a color another active project already uses, unless every color
 // is taken. Archived projects are gray, so they can take any color.
 export async function setProjectColor(id: string, color: ColorId): Promise<SetColorResult> {
-  return db.transaction('rw', db.projects, async (): Promise<SetColorResult> => {
+  return writing(async (): Promise<SetColorResult> => {
     const project = await requireProject(id)
     if (!project.archived && !isColorAvailable(color, await activeColors(id))) {
       return { ok: false, reason: 'color-taken' }
@@ -85,10 +85,7 @@ export async function setPublishDate(
   date: ISODate,
 ): Promise<SetPublishDateResult> {
   assertISODate(date)
-  return db.transaction(
-    'rw',
-    db.projects,
-    db.subtasks,
+  return writing(
     async (): Promise<SetPublishDateResult> => {
       await requireProject(projectId)
       const blocking = tasksEndingAfter(await subtasksOf(projectId).toArray(), date)
@@ -105,7 +102,7 @@ export async function setPublishDate(
 // by the same number of days.
 export async function shiftProject(projectId: string, days: number): Promise<void> {
   if (!Number.isInteger(days)) throw new Error(`Shift must be whole days, got ${days}`)
-  await db.transaction('rw', db.projects, db.subtasks, async () => {
+  await writing(async () => {
     const project = await requireProject(projectId)
     await db.projects.update(projectId, {
       publishDate: addDaysISO(project.publishDate, days),
@@ -117,13 +114,13 @@ export async function shiftProject(projectId: string, days: number): Promise<voi
 }
 
 export async function archiveProject(id: string): Promise<void> {
-  await db.projects.update(id, { archived: true })
+  await writing(() => db.projects.update(id, { archived: true }))
 }
 
 // Makes an archived project active again. It keeps its color unless an
 // active project took it in the meantime, in which case it gets a free one.
 export async function restoreProject(id: string): Promise<void> {
-  await db.transaction('rw', db.projects, async () => {
+  await writing(async () => {
     const project = await requireProject(id)
     const taken = await activeColors(id)
     const color = isColorAvailable(project.color, taken) ? project.color : pickColor(taken)
@@ -132,7 +129,7 @@ export async function restoreProject(id: string): Promise<void> {
 }
 
 export async function deleteProject(id: string): Promise<void> {
-  await db.transaction('rw', db.projects, db.subtasks, async () => {
+  await writing(async () => {
     await subtasksOf(id).delete()
     await db.projects.delete(id)
   })

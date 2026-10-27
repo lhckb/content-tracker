@@ -2,7 +2,7 @@ import { isColorId } from '../lib/colors'
 import { isISODate, todayISO } from '../lib/dates'
 import { PLATFORMS } from '../lib/platforms'
 import type { Project, Subtask, SubtaskKind } from '../types'
-import { db } from './db'
+import { db, writing } from './db'
 import { getTrackerData } from './queries'
 
 const APP_ID = 'content-tracker'
@@ -47,9 +47,8 @@ export async function importBackupText(
   text: string,
 ): Promise<{ projects: number; subtasks: number }> {
   const backup = parseBackup(text)
-  await db.transaction('rw', db.projects, db.subtasks, async () => {
-    await db.projects.clear()
-    await db.subtasks.clear()
+  await writing(async () => {
+    await deleteEverything()
     await db.projects.bulkAdd(backup.projects)
     await db.subtasks.bulkAdd(backup.subtasks)
   })
@@ -57,10 +56,15 @@ export async function importBackupText(
 }
 
 export async function clearAllData(): Promise<void> {
-  await db.transaction('rw', db.projects, db.subtasks, async () => {
-    await db.projects.clear()
-    await db.subtasks.clear()
-  })
+  await writing(deleteEverything)
+}
+
+// Deletes record by record rather than with clear(), which skips Dexie's
+// hooks: in an account space each delete has to be recorded so it reaches
+// the server and the other devices.
+async function deleteEverything(): Promise<void> {
+  await db.subtasks.toCollection().delete()
+  await db.projects.toCollection().delete()
 }
 
 // Checks an untrusted file field by field and keeps only known fields.
