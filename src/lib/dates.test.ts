@@ -1,0 +1,44 @@
+import { describe, expect, it } from 'vitest'
+import {
+  addDaysISO,
+  daysBetween,
+  formatDateRange,
+  isISODate,
+  parseISODate,
+  toISODate,
+} from './dates'
+
+describe('dates', () => {
+  it('runs the tests west of UTC, where UTC parsing would slip a day', () => {
+    expect(new Date(2026, 10, 1).getTimezoneOffset()).toBeGreaterThan(0)
+    expect(parseISODate('2026-11-01').getDate()).toBe(1)
+    expect(toISODate(parseISODate('2026-11-01'))).toBe('2026-11-01')
+  })
+
+  it('accepts real days only', () => {
+    expect(isISODate('2026-11-14')).toBe(true)
+    expect(isISODate('2028-02-29')).toBe(true)
+    expect(isISODate('2026-02-30')).toBe(false)
+    expect(isISODate('2026-11-14T00:00')).toBe(false)
+    expect(isISODate('11/14/2026')).toBe(false)
+    expect(isISODate(20261114)).toBe(false)
+  })
+
+  it('adds days across month ends and the daylight-saving change', () => {
+    expect(addDaysISO('2026-10-30', 3)).toBe('2026-11-02')
+    // US clocks fall back on 2026-11-01.
+    expect(addDaysISO('2026-10-31', 1)).toBe('2026-11-01')
+    expect(addDaysISO('2026-11-01', 1)).toBe('2026-11-02')
+    expect(addDaysISO('2026-03-01', -1)).toBe('2026-02-28')
+  })
+
+  it('counts whole days between dates', () => {
+    expect(daysBetween('2026-10-30', '2026-11-02')).toBe(3)
+    expect(daysBetween('2026-11-02', '2026-10-30')).toBe(-3)
+  })
+
+  it('formats a day or a range', () => {
+    expect(formatDateRange('2026-11-14')).toBe('Nov 14')
+    expect(formatDateRange('2026-11-05', '2026-11-06')).toBe('Nov 5 – Nov 6')
+  })
+})
