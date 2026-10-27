@@ -1,4 +1,4 @@
-import type { ColorId } from '../types'
+import type { ColorId, Project } from '../types'
 
 // In auto-assignment order. Red is left out so it only ever means overdue.
 export const COLOR_IDS: readonly ColorId[] = [
@@ -24,6 +24,17 @@ export const COLOR_HEX: Record<ColorId, string> = {
 }
 
 export const ARCHIVED_HEX = '#a8a29e'
+
+// Archived projects are drawn in gray whatever their color.
+export function projectHex(project: Pick<Project, 'color' | 'archived'>): string {
+  return project.archived ? ARCHIVED_HEX : COLOR_HEX[project.color]
+}
+
+// A CSS color: `hex` mixed into white, e.g. 15 for a light tint. Mixing into
+// 'transparent' instead lets what's underneath (today's shading) show through.
+export function tint(hex: string, percent: number, base = 'white'): string {
+  return `color-mix(in srgb, ${hex} ${percent}%, ${base})`
+}
 
 export function isColorId(value: unknown): value is ColorId {
   return COLOR_IDS.includes(value as ColorId)

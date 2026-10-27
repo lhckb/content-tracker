@@ -32,6 +32,16 @@ export function sortSubtasks(subtasks: readonly Subtask[]): Subtask[] {
   })
 }
 
+export function groupByProject(subtasks: readonly Subtask[]): Map<string, Subtask[]> {
+  const groups = new Map<string, Subtask[]>()
+  for (const subtask of subtasks) {
+    const group = groups.get(subtask.projectId)
+    if (group) group.push(subtask)
+    else groups.set(subtask.projectId, [subtask])
+  }
+  return groups
+}
+
 // Guard rail: a subtask can't end after its project's publish date.
 export function endsAfter(range: DateRange, publishDate: ISODate): boolean {
   return lastDay(range) > publishDate

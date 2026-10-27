@@ -2,4 +2,5 @@
 
 body {
   @apply bg-stone-50 text-stone-900 antialiased;
+  color-scheme: light;
 }
