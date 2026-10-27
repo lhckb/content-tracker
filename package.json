@@ -11,7 +11,8 @@
     "typecheck": "tsc -b",
     "test": "vitest run",
     "test:watch": "vitest",
-    "dev:phone": "vite --host"
+    "dev:phone": "vite --host",
+    "test:db": "bash supabase/tests/run-local.sh"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
