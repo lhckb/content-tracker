@@ -5,6 +5,16 @@ body {
   color-scheme: light;
 }
 
+/* iPhone Safari zooms the page into any field smaller than 16px when it gets
+   focus, so fields are 16px at phone width whatever their utility classes say. */
+@media (max-width: 767px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
 /* While a chip is dragged: one cursor everywhere, and no text selection. */
 html[data-dragging='move'],
 html[data-dragging='move'] * {

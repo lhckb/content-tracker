@@ -18,7 +18,9 @@ function App() {
   const openSubtask = useCallback((id: string) => setPanel({ kind: 'subtask', id }), [])
 
   return (
-    <div className="flex h-screen flex-col">
+    // dvh follows Safari's toolbars as they show and hide; the side insets
+    // keep clear of the notch in landscape.
+    <div className="flex h-dvh flex-col pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)]">
       <TopBar
         hasData={Boolean(data?.projects.length)}
         onNewProject={() => setPanel({ kind: 'new-project' })}

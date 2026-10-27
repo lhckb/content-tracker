@@ -1,5 +1,6 @@
 import type { ColorId, ISODate, Project, Subtask } from '../types'
 import { db } from './db'
+import { newId } from './ids'
 
 // Helpers shared by the data modules. Call them inside a transaction that
 // covers the tables they touch.
@@ -26,7 +27,7 @@ export function newSubtask(
     Partial<Pick<Subtask, 'kind' | 'end'>>,
 ): Subtask {
   return {
-    id: crypto.randomUUID(),
+    id: newId(),
     projectId,
     kind: 'task',
     done: false,

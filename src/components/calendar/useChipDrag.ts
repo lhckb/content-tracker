@@ -1,5 +1,6 @@
 import {
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   useSensor,
   useSensors,
   type DndContextProps,
@@ -23,6 +24,8 @@ interface ActiveDrag {
   mode: DragMode
   // The day under the pointer when the chip was grabbed.
   fromDay: ISODate
+  // For a touch drag, the element the finger went down on (see onDragStart).
+  touchTarget: EventTarget | null
 }
 
 // Day cells carry data-day. Asking the browser what's under the pointer
@@ -40,6 +43,8 @@ function dayAt(x: number, y: number): ISODate | null {
 // the change is saved, with the publish-date prompt where needed.
 export function useChipDrag(data: TrackerData | undefined, onNotice: (message: string) => void) {
   const [preview, setPreview] = useState<DragPreview | null>(null)
+  // The subtask being dragged, for the phone layout's floating copy.
+  const [activeSubtask, setActiveSubtask] = useState<Subtask | null>(null)
   // The data as it was when a drop was saved. The dropped chip stays where it
   // landed until fresh data arrives, so it doesn't flash back first.
   const [savedOver, setSavedOver] = useState<TrackerData | null>(null)
@@ -59,13 +64,15 @@ export function useChipDrag(data: TrackerData | undefined, onNotice: (message: s
 
   const sensors = useSensors(
     // A few pixels of movement before a drag starts, so a click still opens the card.
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
+    // Press and hold to drag by touch, so a swipe still scrolls the page.
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 8 } }),
   )
 
-  const track = useCallback((event: PointerEvent) => {
+  const trackAt = useCallback((x: number, y: number) => {
     const drag = active.current
     if (!drag) return
-    const day = dayAt(event.clientX, event.clientY)
+    const day = dayAt(x, y)
     // Off the grid, the chip goes back to where it was; dropping there cancels.
     const range = day && draggedRange(drag.subtask, drag.mode, drag.fromDay, day)
     setPreview((current) =>
@@ -73,30 +80,49 @@ export function useChipDrag(data: TrackerData | undefined, onNotice: (message: s
     )
   }, [])
 
+  const trackMouse = useCallback((event: MouseEvent) => trackAt(event.clientX, event.clientY), [trackAt])
+  const trackTouch = useCallback(
+    (event: Event) => {
+      const touch = (event as TouchEvent).touches[0]
+      if (touch) trackAt(touch.clientX, touch.clientY)
+    },
+    [trackAt],
+  )
+
   const stop = useCallback(() => {
+    active.current?.touchTarget?.removeEventListener('touchmove', trackTouch)
     active.current = null
-    window.removeEventListener('pointermove', track)
+    window.removeEventListener('mousemove', trackMouse)
     delete document.documentElement.dataset.dragging
-  }, [track])
+  }, [trackMouse, trackTouch])
 
   useEffect(() => stop, [stop])
 
   function onDragStart(event: DragStartEvent) {
     const info = event.active.data.current as ChipDragData | undefined
     const subtask = info && latest.current.data?.subtasks.find((s) => s.id === info.subtaskId)
-    const press = event.activatorEvent as PointerEvent
-    const fromDay = dayAt(press.clientX, press.clientY)
+    const press = event.activatorEvent
+    const touch = 'touches' in press ? (press as TouchEvent).touches[0] : null
+    const point = touch ?? (press as MouseEvent)
+    const fromDay = dayAt(point.clientX, point.clientY)
     if (!info || !subtask || !fromDay) return
-    active.current = { subtask, mode: info.mode, fromDay }
+    // Touch events keep going to the element the finger went down on, even
+    // after it's redrawn elsewhere and removed from the page, when they no
+    // longer reach window. So listen on that element itself.
+    const touchTarget = touch ? press.target : null
+    active.current = { subtask, mode: info.mode, fromDay, touchTarget }
+    setActiveSubtask(subtask)
     setSavedOver(null)
     document.documentElement.dataset.dragging = info.mode === 'move' ? 'move' : 'resize'
-    window.addEventListener('pointermove', track)
+    if (touchTarget) touchTarget.addEventListener('touchmove', trackTouch, { passive: true })
+    else window.addEventListener('mousemove', trackMouse)
   }
 
   async function onDragEnd() {
     const drag = active.current
     const { data: before, preview: dropped } = latest.current
     stop()
+    setActiveSubtask(null)
     justDropped.current = true
     setTimeout(() => {
       justDropped.current = false
@@ -129,6 +155,7 @@ export function useChipDrag(data: TrackerData | undefined, onNotice: (message: s
     onDragEnd: () => void onDragEnd(),
     onDragCancel: () => {
       stop()
+      setActiveSubtask(null)
       setPreview(null)
     },
     // Dragging is a pointer shortcut; keyboard users change dates in the
@@ -143,6 +170,7 @@ export function useChipDrag(data: TrackerData | undefined, onNotice: (message: s
   return {
     dndProps,
     preview,
+    activeSubtask,
     wasJustDropped: () => justDropped.current,
   }
 }

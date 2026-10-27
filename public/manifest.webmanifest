@@ -1,0 +1,15 @@
+{
+  "name": "Content Tracker",
+  "short_name": "Content Tracker",
+  "description": "Plan Instagram and YouTube videos on one color-coded calendar.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#fafaf9",
+  "theme_color": "#ffffff",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

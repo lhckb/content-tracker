@@ -5,6 +5,7 @@ import { sortSubtasks, tasksEndingAfter } from '../lib/subtasks'
 import { defaultTasks, PUBLISH_TITLE } from '../lib/template'
 import type { ColorId, ISODate, Platform, Project, Subtask } from '../types'
 import { db, requestPersistentStorage } from './db'
+import { newId } from './ids'
 import {
   activeColors,
   newSubtask,
@@ -28,7 +29,7 @@ export async function createProject(input: NewProject): Promise<string> {
   void requestPersistentStorage()
   return db.transaction('rw', db.projects, db.subtasks, async () => {
     const project: Project = {
-      id: crypto.randomUUID(),
+      id: newId(),
       title: input.title.trim(),
       platform: input.platform,
       color: pickColor(await activeColors()),

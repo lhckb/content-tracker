@@ -10,7 +10,8 @@ export function TopBar({
   onNotice: (message: string) => void
 }) {
   return (
-    <header className="flex h-14 shrink-0 items-center justify-between border-b border-stone-200 bg-white px-4">
+    // Padded down past the iPhone's status bar and notch.
+    <header className="flex h-[calc(3.5rem+env(safe-area-inset-top))] shrink-0 items-center justify-between border-b border-stone-200 bg-white px-4 pt-[env(safe-area-inset-top)]">
       <h1 className="font-semibold">Content Tracker</h1>
       <div className="flex items-center gap-2">
         <button

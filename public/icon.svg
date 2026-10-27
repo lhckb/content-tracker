@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Full-bleed square: iOS and Android round the corners themselves. -->
+  <rect width="512" height="512" fill="#fafaf9"/>
+  <rect x="96" y="124" width="320" height="292" rx="48" fill="#ffffff" stroke="#44403c" stroke-width="20"/>
+  <path d="M96 204h320" stroke="#44403c" stroke-width="20"/>
+  <path d="M184 92v64M328 92v64" stroke="#44403c" stroke-width="24" stroke-linecap="round"/>
+  <rect x="140" y="252" width="176" height="44" rx="22" fill="#2f7ae5"/>
+  <rect x="212" y="324" width="160" height="44" rx="22" fill="#f0703a"/>
+</svg>
