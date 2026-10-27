@@ -15,7 +15,7 @@ export function ConfirmHost() {
   }
 
   return (
-    <Modal label="Confirm" size="small" focus="[data-confirm]" onClose={() => answer(false)}>
+    <Modal label="Confirm" size="alert" focus="[data-confirm]" onClose={() => answer(false)}>
       <div className="flex flex-col gap-5 p-6">
         <p className="text-sm leading-relaxed whitespace-pre-line">{question.message}</p>
         <footer className="flex justify-end gap-2">

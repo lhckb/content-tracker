@@ -1,4 +1,4 @@
-import { DndContext } from '@dnd-kit/core'
+import { DndContext, DragOverlay } from '@dnd-kit/core'
 import { useMemo, useState } from 'react'
 import type { TrackerData } from '../../data'
 import {
@@ -13,13 +13,15 @@ import {
   weekOf,
   weeksOfMonth,
 } from '../../lib/calendar'
-import { addDaysISO } from '../../lib/dates'
+import { addDaysISO, daysInRange } from '../../lib/dates'
 import { applyPreview } from '../../lib/drag'
 import type { ProjectWithSubtasks } from '../../lib/lanes'
 import { groupByProject } from '../../lib/subtasks'
 import type { ISODate, Project, Subtask } from '../../types'
+import { PHONE_QUERY, useMediaQuery } from '../../hooks/useMediaQuery'
 import { setDone } from '../actions'
 import { cx } from '../cx'
+import { PhoneChipPreview, PhoneMonth, PhoneWeek } from './PhoneCalendar'
 import { useChipDrag } from './useChipDrag'
 import { WeekRow, type CalendarActions, type CalendarMode } from './WeekRow'
 
@@ -40,18 +42,27 @@ export function CalendarView({
   // A day inside the month or week on screen.
   const [anchor, setAnchor] = useState(today)
   const drag = useChipDrag(data, onNotice)
+  const isPhone = useMediaQuery(PHONE_QUERY)
 
-  // While a chip is dragged, everything is laid out as if it had already
-  // moved, so its band and lane redraw around it.
+  // While a chip is dragged on the desktop grid, everything is laid out as if
+  // it had already moved, so its band and lane redraw around it. The phone
+  // lists stay put under the finger and highlight the target days instead.
   const items = useMemo((): ProjectWithSubtasks[] => {
     if (!data) return []
-    const shown = applyPreview(data, drag.preview)
+    const shown = isPhone ? data : applyPreview(data, drag.preview)
     const subtasksByProject = groupByProject(shown.subtasks)
     return shown.projects.map((project) => ({
       project,
       subtasks: subtasksByProject.get(project.id) ?? [],
     }))
-  }, [data, drag.preview])
+  }, [data, drag.preview, isPhone])
+
+  const targetDays = useMemo(
+    () => new Set(drag.preview ? daysInRange(drag.preview.range.start, drag.preview.range.end) : []),
+    [drag.preview],
+  )
+  const draggedProject =
+    drag.activeSubtask && data?.projects.find((p) => p.id === drag.activeSubtask?.projectId)
 
   const month = monthOf(anchor)
   const week = weekOf(anchor)
@@ -88,7 +99,7 @@ export function CalendarView({
         <NavButton label={`Previous ${mode}`} onClick={() => step(-1)}>
           ‹
         </NavButton>
-        <h2 className="min-w-48 text-center text-lg font-semibold">
+        <h2 className="text-center text-base font-semibold md:min-w-48 md:text-lg">
           {mode === 'month' ? formatMonth(month) : formatWeek(week)}
         </h2>
         <NavButton label={`Next ${mode}`} onClick={() => step(1)}>
@@ -111,7 +122,7 @@ export function CalendarView({
               aria-pressed={mode === option}
               onClick={() => switchTo(option)}
               className={cx(
-                'rounded px-3 py-1 text-sm',
+                'rounded px-3 py-1 text-sm max-md:py-2',
                 mode === option ? 'bg-stone-200 font-medium' : 'text-stone-600 hover:bg-stone-100',
               )}
             >
@@ -122,34 +133,63 @@ export function CalendarView({
       </div>
 
       <DndContext {...drag.dndProps}>
-        <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
-          <div className="grid grid-cols-7 border-b border-stone-200 text-center text-xs font-medium text-stone-500">
-            {mode === 'month'
-              ? WEEKDAY_LABELS.map((label) => (
-                  <div key={label} className="py-2">
-                    {label}
-                  </div>
-                ))
-              : daysOfWeek(week).map((day, i) => (
-                  <div key={day} className={cx('py-2', day === today && 'font-semibold text-stone-900')}>
-                    {WEEKDAY_LABELS[i]} {dayOfMonth(day)}
-                    {day === today && ' · Today'}
-                  </div>
-                ))}
+        {isPhone ? (
+          <>
+            {mode === 'month' ? (
+              <PhoneMonth
+                month={month}
+                items={items}
+                today={today}
+                targetDays={targetDays}
+                draggingId={drag.activeSubtask?.id ?? null}
+                actions={actions}
+              />
+            ) : (
+              <PhoneWeek
+                week={week}
+                items={items}
+                today={today}
+                targetDays={targetDays}
+                draggingId={drag.activeSubtask?.id ?? null}
+                actions={actions}
+              />
+            )}
+            <DragOverlay dropAnimation={null}>
+              {drag.activeSubtask && draggedProject && (
+                <PhoneChipPreview task={{ subtask: drag.activeSubtask, project: draggedProject }} />
+              )}
+            </DragOverlay>
+          </>
+        ) : (
+          <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
+            <div className="grid grid-cols-7 border-b border-stone-200 text-center text-xs font-medium text-stone-500">
+              {mode === 'month'
+                ? WEEKDAY_LABELS.map((label) => (
+                    <div key={label} className="py-2">
+                      {label}
+                    </div>
+                  ))
+                : daysOfWeek(week).map((day, i) => (
+                    <div key={day} className={cx('py-2', day === today && 'font-semibold text-stone-900')}>
+                      {WEEKDAY_LABELS[i]} {dayOfMonth(day)}
+                      {day === today && ' · Today'}
+                    </div>
+                  ))}
+            </div>
+            {weeks.map((weekStart) => (
+              <WeekRow
+                key={weekStart}
+                mode={mode}
+                weekStart={weekStart}
+                month={mode === 'month' ? month : null}
+                today={today}
+                items={items}
+                liftedId={drag.preview?.subtaskId ?? null}
+                actions={actions}
+              />
+            ))}
           </div>
-          {weeks.map((weekStart) => (
-            <WeekRow
-              key={weekStart}
-              mode={mode}
-              weekStart={weekStart}
-              month={mode === 'month' ? month : null}
-              today={today}
-              items={items}
-              liftedId={drag.preview?.subtaskId ?? null}
-              actions={actions}
-            />
-          ))}
-        </div>
+        )}
       </DndContext>
     </section>
   )
@@ -191,7 +231,7 @@ function NavButton({
       type="button"
       aria-label={label}
       onClick={onClick}
-      className="rounded-md px-2 py-0.5 text-xl leading-none text-stone-600 hover:bg-stone-100"
+      className="rounded-md px-2 py-0.5 text-xl leading-none text-stone-600 hover:bg-stone-100 max-md:grid max-md:size-10 max-md:place-items-center max-md:p-0"
     >
       {children}
     </button>

@@ -7,6 +7,7 @@ import { PLATFORM_LABELS } from '../lib/platforms'
 import { getProgress } from '../lib/progress'
 import { groupByProject } from '../lib/subtasks'
 import type { ISODate, Project, Subtask } from '../types'
+import { cx } from './cx'
 import { PlatformIcon } from './PlatformIcon'
 import { ProgressBar } from './ProgressBar'
 
@@ -14,10 +15,12 @@ export function Sidebar({
   data,
   today,
   onOpenProject,
+  className,
 }: {
   data: TrackerData | undefined
   today: ISODate
   onOpenProject: (projectId: string) => void
+  className?: string
 }) {
   const [archiveOpen, setArchiveOpen] = useState(false)
   const subtasksByProject = groupByProject(data?.subtasks ?? [])
@@ -29,7 +32,14 @@ export function Sidebar({
     .reverse()
 
   return (
-    <aside className="flex w-60 shrink-0 flex-col gap-3 overflow-y-auto border-r border-stone-200 bg-white p-4">
+    // A column beside the calendar on wider screens; the whole Projects tab
+    // at phone width.
+    <aside
+      className={cx(
+        'flex w-full shrink-0 flex-col gap-3 overflow-y-auto bg-white p-4 md:w-60 md:border-r md:border-stone-200',
+        className,
+      )}
+    >
       <h2 className="text-sm font-medium text-stone-500">Active projects</h2>
       {data && active.length === 0 && (
         <p className="text-sm text-stone-500">
@@ -56,7 +66,7 @@ export function Sidebar({
             type="button"
             aria-expanded={archiveOpen}
             onClick={() => setArchiveOpen((open) => !open)}
-            className="text-sm text-stone-600 hover:text-stone-900"
+            className="text-sm text-stone-600 hover:text-stone-900 max-md:py-2"
           >
             {archiveOpen ? '▾' : '▸'} Archive · {archived.length}{' '}
             {archived.length === 1 ? 'project' : 'projects'}
@@ -77,7 +87,7 @@ export function Sidebar({
                     <button
                       type="button"
                       onClick={() => void restoreProject(project.id)}
-                      className="shrink-0 rounded border border-stone-300 px-2 py-0.5 text-xs text-stone-600 hover:bg-white"
+                      className="shrink-0 rounded border border-stone-300 px-2 py-0.5 text-xs text-stone-600 hover:bg-white max-md:px-3 max-md:py-2 max-md:text-sm"
                     >
                       Restore
                     </button>

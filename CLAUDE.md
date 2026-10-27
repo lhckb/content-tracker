@@ -48,11 +48,16 @@ The full spec is in @SPEC.md and is the source of truth. Read it before writing 
 
 ## Out of scope for the MVP
 
-Do not build any of these: Instagram or YouTube API integration, accounts or cloud sync, notifications, file attachments, time-of-day scheduling, recurring projects, or a phone-specific layout.
+Do not build any of these: Instagram or YouTube API integration, accounts or cloud sync, notifications, file attachments, time-of-day scheduling, or recurring projects.
+
+## Phone layout (added after the MVP)
+
+Below 768px wide (`PHONE_QUERY` in `src/hooks/useMediaQuery.ts`, Tailwind `max-md:`), the sidebar becomes a Projects tab in a bottom tab bar, cards open as full-screen sheets, and the calendar switches to `PhoneMonth`/`PhoneWeek` in `src/components/calendar/PhoneCalendar.tsx`. Touch drags start with press-and-hold. The desktop layout is unchanged, so check both widths when changing UI. The app is meant to be added to the iPhone Home Screen from Safari.
 
 ## Commands
 
 - `npm run dev`: dev server at http://localhost:5173
+- `npm run dev:phone`: the same, reachable from a phone on the same Wi-Fi (open the Network address it prints)
 - `npm run build`: typecheck, then production build into `dist/`
 - `npm run typecheck`: TypeScript only (`tsc -b`)
 - `npm test`: Vitest, once; `npm run test:watch` to rerun on save. Tests run in `America/Los_Angeles` so UTC date-parsing bugs fail, and use fake-indexeddb, so data-layer tests need no browser.
