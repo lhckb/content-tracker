@@ -74,7 +74,7 @@ Below 768px wide (`PHONE_QUERY` in `src/hooks/useMediaQuery.ts`, Tailwind `max-m
 ## Commands
 
 - `npm run dev`: dev server at http://localhost:5173
-- `npm run dev:phone`: the same, reachable from a phone on the same Wi-Fi (open the Network address it prints)
+- `npm run dev:phone`: the same, reachable from a phone on the same Wi-Fi at http://luiss-macbook-air.local:5173 (the Mac's network name, allowed in `vite.config.ts`). For Google sign-in to return there, that address must be in the dev Supabase project's Redirect URLs. Over plain HTTP the sign-in falls back to a weaker code check (a console warning); the HTTPS live site doesn't.
 - `npm run build`: typecheck, then production build into `dist/`
 - `npm run typecheck`: TypeScript only (`tsc -b`)
 - `npm test`: Vitest, once; `npm run test:watch` to rerun on save. Tests run in `America/Los_Angeles` so UTC date-parsing bugs fail, and use fake-indexeddb, so data-layer tests need no browser.
