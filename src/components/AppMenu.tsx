@@ -1,5 +1,11 @@
 import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from 'react'
-import { backupFileName, clearAllData, exportBackupText, importBackupText } from '../data'
+import {
+  backupFileName,
+  clearAllData,
+  exportBackupText,
+  importBackupText,
+  useAccount,
+} from '../data'
 import { loadSampleData } from '../dev/sampleData'
 import { ask } from './ask'
 import { cx } from './cx'
@@ -13,6 +19,7 @@ export function AppMenu({
   hasData: boolean
   onNotice: (message: string) => void
 }) {
+  const account = useAccount()
   const [open, setOpen] = useState(false)
   // The backup, prepared as the menu opens: the iPhone share sheet only opens
   // straight from a tap, with no waiting on the database first.
@@ -56,7 +63,8 @@ export function AppMenu({
 
   async function confirmReplace(): Promise<boolean> {
     if (!hasData) return true
-    return ask('This replaces every project currently stored. Continue?', {
+    const where = account.state === 'signed-in' ? 'in your account, on all your devices' : 'on this device'
+    return ask(`This replaces every project ${where}. Continue?`, {
       confirmLabel: 'Replace',
       danger: true,
     })
@@ -98,7 +106,11 @@ export function AppMenu({
           className="absolute top-full right-0 z-30 mt-1 w-60 rounded-md border border-stone-200 bg-white py-1 shadow-lg"
         >
           <p className="px-3 pt-1.5 pb-2 text-xs leading-snug text-stone-500">
-            Projects are saved in this browser only. Export a backup now and then.
+            {account.state === 'signed-in'
+              ? `Synced to your account, ${account.email}.`
+              : account.state === 'signed-out'
+                ? 'Saved on this device only. Sign in to keep your projects on all your devices.'
+                : 'Projects are saved in this browser only. Export a backup now and then.'}
           </p>
           <MenuItem
             onClick={() => {

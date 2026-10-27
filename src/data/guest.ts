@@ -51,3 +51,20 @@ export async function copyGuestProjects(): Promise<number> {
   })
   return guest.projects.length
 }
+
+const OFFERED = 'guestCopyOffered'
+
+// How many guest projects to offer to copy into the account just signed in
+// to: 0 if there are none, or this device already asked for this account.
+export async function guestCopyOffer(): Promise<number> {
+  if (currentSpace().kind !== 'account' || (await db.meta.get(OFFERED))) return 0
+  return countGuestProjects()
+}
+
+// Records the answer so the device doesn't ask again, copying if it was
+// yes. Returns how many projects were copied.
+export async function answerGuestCopyOffer(copy: boolean): Promise<number> {
+  const copied = copy ? await copyGuestProjects() : 0
+  await writing(() => db.meta.put({ key: OFFERED, value: new Date().toISOString() }))
+  return copied
+}

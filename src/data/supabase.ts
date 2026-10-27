@@ -1,6 +1,10 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { ProjectRow, Rows, SubtaskRow, SyncServer } from './remote'
 
+// The address the app was opened at, read before the client below can tidy
+// it: a refused Google sign-in comes back with its reason in the URL.
+export const openedAt = typeof window === 'undefined' ? '' : window.location.href
+
 // The project's URL and publishable key, set at build time: .env.local in
 // development, GitHub Actions variables for the live site. Both are public
 // by design; the database's rules (supabase/migrations) decide what each
