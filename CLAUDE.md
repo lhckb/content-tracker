@@ -11,6 +11,7 @@ The full spec is in @SPEC.md and is the source of truth. Read it before writing 
 - Start by proposing a plan for the milestones below, list your open questions, and wait for my go-ahead.
 - Initialize a git repo and commit at the end of each milestone, then pause so I can try the app before you continue.
 - Ask before adding any dependency not listed under Stack.
+- Record every manual test (anything not part of `npm test`, done by hand or with a throwaway browser or API script) in `docs/testing/manual-tests.md`: what was checked, where, how, and the result, including failures and what was done about them. Log tests the user reports too.
 
 ## Milestones (whole MVP, in this order)
 
