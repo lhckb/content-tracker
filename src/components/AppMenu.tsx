@@ -14,8 +14,22 @@ export function AppMenu({
   onNotice: (message: string) => void
 }) {
   const [open, setOpen] = useState(false)
+  // The backup, prepared as the menu opens: the iPhone share sheet only opens
+  // straight from a tap, with no waiting on the database first.
+  const [backup, setBackup] = useState<string | null>(null)
   const rootRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    let current = true
+    void exportBackupText().then((text) => {
+      if (current) setBackup(text)
+    })
+    return () => {
+      current = false
+    }
+  }, [open])
 
   useEffect(() => {
     if (!open) return
@@ -67,7 +81,7 @@ export function AppMenu({
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
-        className="rounded-md px-2.5 py-1 text-lg leading-none text-stone-600 hover:bg-stone-100"
+        className="rounded-md px-2.5 py-1 text-lg leading-none text-stone-600 hover:bg-stone-100 max-md:grid max-md:size-11 max-md:place-items-center max-md:p-0"
       >
         ⋯
       </button>
@@ -87,12 +101,13 @@ export function AppMenu({
             Projects are saved in this browser only. Export a backup now and then.
           </p>
           <MenuItem
-            onClick={() =>
+            onClick={() => {
+              const prepared = backup
               run(async () => {
-                downloadTextFile(backupFileName(), await exportBackupText())
-                return 'Backup exported.'
+                const saved = await saveBackup(prepared ?? (await exportBackupText()))
+                return saved ? 'Backup exported.' : ''
               })
-            }
+            }}
           >
             Export backup
           </MenuItem>
@@ -158,7 +173,7 @@ function MenuItem({
       role="menuitem"
       onClick={onClick}
       className={cx(
-        'block w-full px-3 py-1.5 text-left text-sm hover:bg-stone-100',
+        'block w-full px-3 py-1.5 text-left text-sm hover:bg-stone-100 max-md:py-3',
         danger && 'text-red-700',
       )}
     >
@@ -169,6 +184,25 @@ function MenuItem({
 
 function plural(count: number, noun: string): string {
   return `${count} ${noun}${count === 1 ? '' : 's'}`
+}
+
+// On a phone, hands the backup to the share sheet ("Save to Files"), the
+// dependable way to save a file on an iPhone, especially from a Home Screen
+// app. Elsewhere, or if sharing isn't possible, a normal download. Resolves
+// false if the person closed the share sheet without saving.
+async function saveBackup(text: string): Promise<boolean> {
+  const fileName = backupFileName()
+  const file = new File([text], fileName, { type: 'application/json' })
+  if (matchMedia('(pointer: coarse)').matches && navigator.canShare?.({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file] })
+      return true
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return false
+    }
+  }
+  downloadTextFile(fileName, text)
+  return true
 }
 
 function downloadTextFile(fileName: string, text: string) {

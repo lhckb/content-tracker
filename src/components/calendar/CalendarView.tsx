@@ -122,7 +122,7 @@ export function CalendarView({
               aria-pressed={mode === option}
               onClick={() => switchTo(option)}
               className={cx(
-                'rounded px-3 py-1 text-sm',
+                'rounded px-3 py-1 text-sm max-md:py-2',
                 mode === option ? 'bg-stone-200 font-medium' : 'text-stone-600 hover:bg-stone-100',
               )}
             >
@@ -231,7 +231,7 @@ function NavButton({
       type="button"
       aria-label={label}
       onClick={onClick}
-      className="rounded-md px-2 py-0.5 text-xl leading-none text-stone-600 hover:bg-stone-100"
+      className="rounded-md px-2 py-0.5 text-xl leading-none text-stone-600 hover:bg-stone-100 max-md:grid max-md:size-10 max-md:place-items-center max-md:p-0"
     >
       {children}
     </button>

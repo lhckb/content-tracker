@@ -66,7 +66,7 @@ export function Sidebar({
             type="button"
             aria-expanded={archiveOpen}
             onClick={() => setArchiveOpen((open) => !open)}
-            className="text-sm text-stone-600 hover:text-stone-900"
+            className="text-sm text-stone-600 hover:text-stone-900 max-md:py-2"
           >
             {archiveOpen ? '▾' : '▸'} Archive · {archived.length}{' '}
             {archived.length === 1 ? 'project' : 'projects'}
@@ -87,7 +87,7 @@ export function Sidebar({
                     <button
                       type="button"
                       onClick={() => void restoreProject(project.id)}
-                      className="shrink-0 rounded border border-stone-300 px-2 py-0.5 text-xs text-stone-600 hover:bg-white"
+                      className="shrink-0 rounded border border-stone-300 px-2 py-0.5 text-xs text-stone-600 hover:bg-white max-md:px-3 max-md:py-2 max-md:text-sm"
                     >
                       Restore
                     </button>

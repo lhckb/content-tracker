@@ -127,7 +127,7 @@ export function ProjectDetail({
           type="button"
           aria-expanded={shifting}
           onClick={() => setShifting((open) => !open)}
-          className={cx(BUTTON, 'ml-auto')}
+          className={cx(BUTTON, 'md:ml-auto')}
         >
           Shift project…
         </button>
@@ -260,7 +260,7 @@ function SubtaskRow({
         aria-label={`${subtask.title} done`}
         checked={subtask.done}
         onChange={(event) => onToggle(event.target.checked)}
-        className="ml-3 size-4 shrink-0"
+        className="ml-3 size-4 shrink-0 max-md:size-5"
       />
       <button
         type="button"
@@ -355,7 +355,7 @@ function AddSubtaskForm({
         type="button"
         aria-label="Cancel adding a subtask"
         onClick={onDone}
-        className="px-1 text-stone-500 hover:text-stone-800"
+        className="px-1 text-stone-500 hover:text-stone-800 max-md:px-3 max-md:py-2"
       >
         ✕
       </button>
@@ -412,7 +412,7 @@ function ShiftForm({ project, onDone }: { project: Project; onDone: (message?: s
 function ColorSwatches({ project, otherActive }: { project: Project; otherActive: Project[] }) {
   const taken = otherActive.map((p) => p.color)
   return (
-    <div role="group" aria-label="Color" className="flex items-center gap-1.5">
+    <div role="group" aria-label="Color" className="flex items-center gap-1.5 max-md:gap-2">
       {COLOR_IDS.map((color) => {
         const current = project.color === color
         const owner = otherActive.find((p) => p.color === color)
@@ -429,7 +429,7 @@ function ColorSwatches({ project, otherActive }: { project: Project; otherActive
             disabled={!available}
             onClick={() => void setProjectColor(project.id, color)}
             className={cx(
-              'size-5 rounded-full ring-offset-2 disabled:cursor-not-allowed disabled:opacity-25',
+              'size-5 rounded-full ring-offset-2 disabled:cursor-not-allowed disabled:opacity-25 max-md:size-7',
               current && 'ring-2 ring-stone-700',
             )}
             style={{ background: COLOR_HEX[color] }}

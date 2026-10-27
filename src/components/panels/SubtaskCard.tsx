@@ -124,7 +124,7 @@ export function SubtaskCard({
                     aria-label="Make it a single day"
                     title="Make it a single day"
                     onClick={() => void commitEnd(undefined)}
-                    className="px-1 text-stone-500 hover:text-stone-800"
+                    className="px-1 text-stone-500 hover:text-stone-800 max-md:px-3 max-md:py-2"
                   >
                     ✕
                   </button>

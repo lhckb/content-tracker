@@ -70,7 +70,7 @@ export function CloseButton({ onClick }: { onClick: () => void }) {
       type="button"
       aria-label="Close"
       onClick={onClick}
-      className="ml-auto shrink-0 rounded-md px-2 py-1 text-lg leading-none text-stone-500 hover:bg-stone-100"
+      className="ml-auto shrink-0 rounded-md px-2 py-1 text-lg leading-none text-stone-500 hover:bg-stone-100 max-md:grid max-md:size-11 max-md:place-items-center max-md:p-0"
     >
       ✕
     </button>
