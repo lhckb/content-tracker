@@ -1,6 +1,6 @@
 # Plan: Ideas
 
-Status: draft, waiting for your answers to the questions at the end · 2026-10-27
+Status: approved, not started · 2026-10-27. You accepted every recommendation (decisions at the end).
 
 ## Goal
 
@@ -13,13 +13,16 @@ Ideas never show on the calendar, in the project list or in any progress, and th
 ### Getting there
 
 - **Phone:** a third tab in the bottom bar, **Calendar · Projects · Ideas**, with a light-bulb icon.
-- **Desktop:** see question A. My recommendation is a **Calendar | Ideas** switch in the top bar, next to the app name. Ideas then takes the whole area below the top bar, sidebar included, since the sidebar lists projects. The browser remembers the choice, as it does Month/Week.
+- **Desktop:** a **Calendar | Ideas** switch in the top bar, next to the app name (decision A). Ideas takes the whole area below the top bar, sidebar included, since the sidebar lists projects. The browser remembers the choice, as it does Month/Week.
 
 ### The Ideas area
 
 - **Two columns, YouTube and Instagram,** each headed by its icon and a count ("YouTube · 7"). On the phone, a YouTube | Instagram switch at the top shows one column at a time.
-- **Adding** (question E): an "Add an idea…" field at the top of each column. Type a title and press Enter. The idea is added and the field is ready for the next one.
-- **Cards, grouped by month** (questions C and D): "November 2026", "December 2026"…, then "No month".
+- **Adding** (decision E): an "Add an idea…" field at the top of each column. Type a title and press Enter. The idea is added and the field is ready for the next one.
+- **Cards, grouped by month** (decisions C and D):
+  - month headings, soonest first ("November 2026", "December 2026"…), then "No month";
+  - the newest first within each group;
+  - months that have passed stay at the top, under a heading marked "past", with no red.
 - **Each card:** the title, the first three lines of the description, and a **Make project** button.
 - **When empty:** "No YouTube ideas yet."
 
@@ -38,7 +41,7 @@ It opens on click: a small card on desktop, like the subtask card, and a full-sc
 ### Make project
 
 1. It opens the usual **New project** dialog, filled in from the idea: the title, the platform, and "Start with default subtasks" ticked.
-2. **You pick the publish date,** which is required, as for any project (question B). If the idea has a month, the dialog shows "Planned for March 2027" under the date.
+2. **You pick the publish date,** which is required, as for any project (decision B). It starts empty. If the idea has a month, the dialog shows "Planned for March 2027" under the date.
 3. **Create does it all as one change:**
    - the project is created, with the next free color, its default subtasks and Publish;
    - the idea's description becomes the project's Notes;
@@ -130,37 +133,37 @@ One branch (`ideas`), one PR, and a commit per step. You merge.
 - **The migration order.** If the new app went live before production had the migration, sync would fail with an error until it did. The order in step 4 avoids that.
 - **Old tabs on other devices.** They keep syncing projects, and ideas appear there once the tab reloads with the new version.
 
-## Open questions
+## Decisions
 
-Write your answer after each **A:**, or reply "go with your recommendations".
+You accepted the recommended option for every question.
 
 **A. Desktop: where does Ideas live?**
 - *(Recommended)* A "Calendar | Ideas" switch in the top bar, with Ideas taking the whole area below it.
 - An "Ideas" button that opens a large card over the calendar, like the project detail.
 
-A:
+A: the Calendar | Ideas switch in the top bar.
 
 **B. Making a project from an idea that has a month: what should the publish date start as?**
 - *(Recommended)* Empty, with "Planned for March 2027" shown under it, so you always pick the day.
 - The last day of that month, ready to change.
 
-A:
+A: empty, with the planned month shown under it.
 
 **C. Order within each column?**
 - *(Recommended)* Grouped under month headings, soonest first, then "No month", with the newest first within each group.
 - Newest first with no grouping, and the month shown on each card.
 - Your own order, by dragging.
 
-A:
+A: grouped under month headings, soonest first, then "No month", with the newest first within each group.
 
 **D. Ideas whose month has passed, e.g. one planned for September 2026, seen in November?**
 - *(Recommended)* They stay at the top, under a heading marked "past", with no red, since red means overdue tasks.
 - Nothing special: just their month heading.
 
-A:
+A: under a heading marked "past" at the top, with no red.
 
 **E. Adding an idea?**
 - *(Recommended)* A quick "Add an idea…" field at the top of each column: type a title and press Enter, then open the card for the description and month.
 - A "+ Add idea" button that opens an empty idea card each time.
 
-A:
+A: the quick "Add an idea…" field at the top of each column.
