@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { clearAllData, createProject, getProject, getSubtasks } from '../data'
+import { getProgress } from '../lib/progress'
 import { addTask, movePublishDate, moveTask, setDone } from './actions'
 
 const confirm = vi.fn<(message: string) => boolean>()
@@ -80,5 +81,15 @@ describe('setDone', () => {
     expect(await setDone(named('Publish'), project, true)).toBe(true)
     expect(confirm).toHaveBeenCalledOnce()
     expect((await getProject(id))?.archived).toBe(true)
+  })
+
+  it('reaches 100% when Publish is ticked, even if archiving is declined', async () => {
+    const { id, named } = await sampleProject()
+    const project = (await getProject(id))!
+    confirm.mockReturnValue(false)
+
+    await setDone(named('Publish'), project, true)
+    expect(getProgress(await getSubtasks(id)).percent).toBe(100)
+    expect((await getProject(id))?.archived).toBe(false)
   })
 })

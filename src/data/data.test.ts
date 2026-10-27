@@ -163,6 +163,34 @@ describe('addSubtask', () => {
   })
 })
 
+describe('ticking Publish', () => {
+  it('ticks every other subtask, and unticking it leaves them ticked', async () => {
+    const id = await newProject()
+    await updateSubtask((await subtaskNamed(id, 'Script')).id, { done: true })
+    const publish = await subtaskNamed(id, 'Publish')
+
+    await updateSubtask(publish.id, { done: true })
+    expect((await getSubtasks(id)).every((s) => s.done)).toBe(true)
+
+    await updateSubtask(publish.id, { done: false })
+    const after = await getSubtasks(id)
+    expect(after.filter((s) => s.done).map((s) => s.title)).toEqual([
+      'Script',
+      'A-roll',
+      'B-roll',
+      'Edit',
+      'Thumbnail',
+    ])
+  })
+
+  it("leaves other projects' subtasks alone", async () => {
+    const id = await newProject()
+    const other = await newProject({ title: 'Other' })
+    await updateSubtask((await subtaskNamed(id, 'Publish')).id, { done: true })
+    expect((await getSubtasks(other)).some((s) => s.done)).toBe(false)
+  })
+})
+
 describe('shiftProject', () => {
   it('moves every subtask, done or not, and the publish date', async () => {
     const id = await newProject()

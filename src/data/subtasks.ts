@@ -86,6 +86,9 @@ export async function moveSubtask(
 
 export type SubtaskPatch = Partial<Pick<Subtask, 'title' | 'notes' | 'done'>>
 
+// Ticking Publish means the video is out, so it also ticks every other
+// subtask of the project and progress reaches 100%. Unticking Publish
+// leaves the others as they are.
 export async function updateSubtask(id: string, patch: SubtaskPatch): Promise<void> {
   await db.transaction('rw', db.subtasks, async () => {
     const subtask = await requireSubtask(id)
@@ -93,6 +96,9 @@ export async function updateSubtask(id: string, patch: SubtaskPatch): Promise<vo
       throw new Error("The Publish subtask can't be renamed")
     }
     await db.subtasks.update(id, patch)
+    if (patch.done && isPublish(subtask)) {
+      await subtasksOf(subtask.projectId).modify({ done: true })
+    }
   })
 }
 

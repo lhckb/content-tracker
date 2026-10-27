@@ -38,12 +38,15 @@ export async function movePublishDate(projectId: string, date: ISODate): Promise
   return `${listTitles(result.tasks.map((t) => t.title))} ${count === 1 ? 'ends' : 'end'} after ${formatShortDate(date)}. Move ${count === 1 ? 'it' : 'them'} first, or shift the whole project.`
 }
 
-// Ticks a subtask on or off. Ticking Publish offers to archive the project;
-// resolves true if it was archived.
+// Ticks a subtask on or off. Ticking Publish also ticks the rest (see
+// updateSubtask) and offers to archive the project; resolves true if it was
+// archived.
 export async function setDone(subtask: Subtask, project: Project, done: boolean): Promise<boolean> {
   await updateSubtask(subtask.id, { done })
   if (!done || !isPublish(subtask) || project.archived) return false
-  if (!confirm(`"${project.title}" is published. Archive the project?`)) return false
+  if (!confirm(`"${project.title}" is published and all its subtasks are done. Archive the project?`)) {
+    return false
+  }
   await archiveProject(project.id)
   return true
 }
