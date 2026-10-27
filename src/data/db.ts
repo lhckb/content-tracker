@@ -24,10 +24,17 @@ export interface PendingChange {
   deleted?: Project | Subtask
 }
 
+// Sync bookkeeping, such as how far this device has pulled.
+export interface MetaEntry {
+  key: string
+  value: string
+}
+
 export type TrackerDb = Dexie & {
   projects: EntityTable<Project, 'id'>
   subtasks: EntityTable<Subtask, 'id'>
   pending: EntityTable<PendingChange, 'key'>
+  meta: EntityTable<MetaEntry, 'key'>
 }
 
 export const GUEST_DB_NAME = 'content-tracker'
@@ -40,6 +47,7 @@ function openSpaceDb(space: Space): TrackerDb {
   const database = new Dexie(spaceDbName(space)) as TrackerDb
   database.version(1).stores({ projects: 'id', subtasks: 'id, projectId' })
   database.version(2).stores({ pending: 'key' })
+  database.version(3).stores({ meta: 'key' })
   if (space.kind === 'account') recordChanges(database)
   return database
 }
@@ -78,7 +86,7 @@ export async function deleteAccountSpace(userId: string): Promise<void> {
 // Every write runs in one of these, so the change recording below can add to
 // the pending table in the same transaction.
 export function writing<T>(fn: () => Promise<T>): Promise<T> {
-  return db.transaction('rw', db.projects, db.subtasks, db.pending, fn)
+  return db.transaction('rw', [db.projects, db.subtasks, db.pending, db.meta], fn)
 }
 
 // Transactions applying changes that came from the server, whose writes
