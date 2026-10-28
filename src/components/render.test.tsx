@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { getIdeas, getTrackerData, type TrackerData } from '../data'
-import { ARCHIVED_HEX } from '../lib/colors'
+import { ARCHIVED_HEX, COLOR_HEX, tint } from '../lib/colors'
 import { loadSampleData } from '../dev/sampleData'
 import type { Idea } from '../types'
 import { CalendarView } from './calendar/CalendarView'
@@ -53,7 +53,7 @@ describe('CalendarView', () => {
       'Edit, Nov 5–6',
       'Thumbnail, Nov 11',
       'Publish, Nov 14',
-      'Back up raw footage, Nov 15',
+      'Back up raw footage, clean-up, Nov 15',
     ])
     expect(html()).toContain('Edit · 2 days')
     expect(html()).toContain('Script ✓')
@@ -61,8 +61,14 @@ describe('CalendarView', () => {
 
   it('outlines overdue chips in red', () => {
     expect(chipTag(html(), 'Gym Reel: leg day: B-roll, Nov 4, overdue')).toContain('border-red-600')
-    expect(chipTag(html(), 'Packing tips Reel: Back up raw footage, Nov 4, overdue')).toContain('border-red-600')
+    expect(chipTag(html(), 'Packing tips Reel: Back up raw footage, clean-up, Nov 4, overdue')).toContain('border-red-600')
     expect(html().match(/border-red-600/g)).toHaveLength(2)
+  })
+
+  it('draws the band on, lighter, past Publish to the last clean-up task', () => {
+    // Morning routine vlog (blue) publishes Nov 14, with clean-up on Nov 15.
+    expect(html()).toContain(`background:${tint(COLOR_HEX.blue, 8, 'transparent')}`)
+    expect(html()).toContain(`background:${tint(COLOR_HEX.blue, 16, 'transparent')}`)
   })
 
   it('draws archived projects in gray', () => {

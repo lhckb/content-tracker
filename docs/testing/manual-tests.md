@@ -19,6 +19,33 @@ The scripts were throwaway and not committed; their steps are written out below.
 
 ---
 
+## Branch `cleanup-tasks`: clean-up tasks (2026-10-28)
+
+### T-19 · Clean-up tasks on the phone calendar · ✅
+- **Where:** the dev server, signed out, in WebKit emulating an iPhone 15, with the sample data. Today was 2026-10-28.
+- **How:** in the month view, tap Oct 27; then switch to the week view.
+- **Result:**
+  - The month lanes and the week view's day lines carry the wrapping-up project's band on past its Publish (Oct 25), in a lighter tint, to its last clean-up task.
+  - Oct 27's list shows "Back up raw footage" with the broom, a red outline and "Overdue · Clean-up · Packing tips Reel". Its label reads "…Back up raw footage, clean-up, Oct 27, overdue".
+  - No console errors.
+
+### T-18 · Clean-up tasks on the desktop calendar · ✅
+- **Where:** the dev server, signed out, in headless Chromium at 1440×900, with the sample data.
+- **How and result:**
+
+  | Step | Result |
+  | --- | --- |
+  | October, month view | The wrapping-up project's band runs on past Publish (Oct 25) in a lighter tint to its last clean-up task (Oct 30). Clean-up chips show a broom. The overdue one (Oct 27) has the red outline |
+  | November: drag the in-progress project's clean-up task from Nov 7 to Nov 9, after its Publish (Nov 6) | No prompt to push the publish date. The chip lands on Nov 9 and the lighter part stretches to it |
+  | Week view, Oct 25–31 | Clean-up chips show the broom, and their second line reads "Clean-up · Packing tips Reel" |
+
+- No console errors.
+- **The script's first two runs failed** before reaching the drag, both its own mistakes:
+  - it looked for the Nov 7 chip while October was showing;
+  - it then dropped on Monday of the wrong week row, landing on Nov 2. The app handled that correctly: a clean-up task before Publish is allowed (decision K), and the lighter part disappeared since nothing was left after Publish.
+
+---
+
 ## Branch `ideas`: the Ideas area (2026-10-28)
 
 ### T-17 · The ideas migration on production, from outside · ✅

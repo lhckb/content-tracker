@@ -12,8 +12,9 @@ import {
   type WeekPlacement,
 } from '../../lib/lanes'
 import { isOverdue } from '../../lib/overdue'
-import { isPublish } from '../../lib/subtasks'
+import { isCleanup, isPublish } from '../../lib/subtasks'
 import type { ISODate, Project, Subtask } from '../../types'
+import { CleanupIcon } from '../CleanupIcon'
 import { cx } from '../cx'
 import { stopDragStart, type ChipDragData } from './useChipDrag'
 
@@ -131,16 +132,26 @@ function LaneRow({
     >
       {lane.segments.map((segment) => (
         <Fragment key={segment.project.id}>
-          <div
-            title={`Open ${segment.project.title}`}
-            onClick={() => actions.onOpenProject(segment.project.id)}
-            className={cx(edges(segment, 'band'), 'cursor-pointer')}
-            style={{
-              gridColumn: columns(segment),
-              gridRow: '1 / -1',
-              background: tint(projectHex(segment.project), 16, 'transparent'),
-            }}
-          />
+          {/* Up to the publish date, then lighter on to the last clean-up task. */}
+          {([
+            [segment.main, 16],
+            [segment.tail, 8],
+          ] as const).map(
+            ([part, strength]) =>
+              part && (
+                <div
+                  key={strength}
+                  title={`Open ${segment.project.title}`}
+                  onClick={() => actions.onOpenProject(segment.project.id)}
+                  className={cx(edges(part, 'band'), 'cursor-pointer')}
+                  style={{
+                    gridColumn: columns(part),
+                    gridRow: '1 / -1',
+                    background: tint(projectHex(segment.project), strength, 'transparent'),
+                  }}
+                />
+              ),
+          )}
           {segment.chips.map((chip) => (
             <Chip
               key={chip.subtask.id}
@@ -177,6 +188,7 @@ function Chip({
   actions: CalendarActions
 }) {
   const { subtask } = chip
+  const cleanup = isCleanup(subtask)
   // Archived projects stay put; Publish moves but is always one day.
   const movable = !project.archived
   const resizable = movable && !isPublish(subtask)
@@ -192,7 +204,7 @@ function Chip({
   const overdue = !project.archived && isOverdue(subtask, today)
   const days = subtask.end ? daysBetween(subtask.start, subtask.end) + 1 : 1
   const length = days > 1 ? ` · ${days} days` : ''
-  const detail = `${project.title}: ${subtask.title}, ${formatDateRange(subtask.start, subtask.end)}${
+  const detail = `${project.title}: ${subtask.title}${cleanup ? ', clean-up' : ''}, ${formatDateRange(subtask.start, subtask.end)}${
     subtask.done ? ', done' : overdue ? ', overdue' : ''
   }`
   const open = () => actions.onOpenSubtask(subtask.id)
@@ -238,7 +250,12 @@ function Chip({
         onClick={open}
         className={cx(shared.className, 'items-center px-1.5 hover:brightness-95', subtask.done && 'opacity-50')}
       >
-        {handles(<span className="truncate">{`${subtask.title}${length}${subtask.done ? ' ✓' : ''}`}</span>)}
+        {handles(
+          <>
+            {cleanup && <CleanupIcon className="mr-1 size-3 shrink-0" />}
+            <span className="truncate">{`${subtask.title}${length}${subtask.done ? ' ✓' : ''}`}</span>
+          </>,
+        )}
       </button>
     )
   }
@@ -265,11 +282,13 @@ function Chip({
             className={cx('min-w-0 flex-1 text-left', subtask.done && 'opacity-50')}
           >
             <span className={cx('block leading-snug', subtask.done && 'line-through')}>
+              {cleanup && <CleanupIcon className="mr-1 inline size-3 align-[-1px]" />}
               {subtask.title}
             </span>
             {/* "Overdue" first, so a narrow column cuts the project name instead. */}
             <span className="block truncate text-[11px] font-normal text-stone-600">
               {overdue && <span className="font-medium text-red-700">Overdue · </span>}
+              {cleanup && 'Clean-up · '}
               {project.title}
               {length}
             </span>
