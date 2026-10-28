@@ -1,39 +1,48 @@
 import Dexie from 'dexie'
 import { pickColor } from '../lib/colors'
-import type { ColorId, Project, Subtask } from '../types'
+import type { ColorId, Idea, Project, Subtask } from '../types'
 import { currentSpace, db, GUEST_DB_NAME, writing } from './db'
 
-// The projects made on this device while signed out, which the app offers
-// to copy into the account at sign-in.
+// The projects and ideas made on this device while signed out, which the
+// app offers to copy into the account at sign-in.
 
-async function readGuestSpace(): Promise<{ projects: Project[]; subtasks: Subtask[] }> {
+export interface GuestCounts {
+  projects: number
+  ideas: number
+}
+
+const NONE: GuestCounts = { projects: 0, ideas: 0 }
+
+async function readGuestSpace(): Promise<{ projects: Project[]; subtasks: Subtask[]; ideas: Idea[] }> {
   // A second handle on the guest database, readable while an account's is
-  // the current one. Opened without a schema: it only reads.
+  // the current one. Opened without a schema: it only reads. A table can be
+  // missing if the guest space was last opened by an older version.
   const guest = new Dexie(GUEST_DB_NAME)
   try {
     await guest.open()
     const tables = guest.tables.map((t) => t.name)
-    if (!tables.includes('projects') || !tables.includes('subtasks')) {
-      return { projects: [], subtasks: [] }
-    }
+    const read = async <T>(name: string): Promise<T[]> =>
+      tables.includes(name) ? guest.table<T>(name).toArray() : []
     return {
-      projects: await guest.table<Project>('projects').toArray(),
-      subtasks: await guest.table<Subtask>('subtasks').toArray(),
+      projects: await read<Project>('projects'),
+      subtasks: await read<Subtask>('subtasks'),
+      ideas: await read<Idea>('ideas'),
     }
   } finally {
     guest.close()
   }
 }
 
-export async function countGuestProjects(): Promise<number> {
-  return (await readGuestSpace()).projects.length
+export async function countGuestData(): Promise<GuestCounts> {
+  const { projects, ideas } = await readGuestSpace()
+  return { projects: projects.length, ideas: ideas.length }
 }
 
-// Copies every guest project, with its subtasks, into the signed-in
-// account. They keep their ids; an active project whose color an account
-// project already uses gets a free one. The guest space is left as it was.
-// Returns how many projects were copied.
-export async function copyGuestProjects(): Promise<number> {
+// Copies every guest project, with its subtasks, and every guest idea into
+// the signed-in account. They keep their ids; an active project whose color
+// an account project already uses gets a free one. The guest space is left
+// as it was. Returns how many were copied.
+export async function copyGuestData(): Promise<GuestCounts> {
   if (currentSpace().kind !== 'account') throw new Error('Sign in before copying guest projects')
   const guest = await readGuestSpace()
   await writing(async () => {
@@ -48,23 +57,24 @@ export async function copyGuestProjects(): Promise<number> {
     })
     await db.projects.bulkPut(projects)
     await db.subtasks.bulkPut(guest.subtasks)
+    await db.ideas.bulkPut(guest.ideas)
   })
-  return guest.projects.length
+  return { projects: guest.projects.length, ideas: guest.ideas.length }
 }
 
 const OFFERED = 'guestCopyOffered'
 
-// How many guest projects to offer to copy into the account just signed in
-// to: 0 if there are none, or this device already asked for this account.
-export async function guestCopyOffer(): Promise<number> {
-  if (currentSpace().kind !== 'account' || (await db.meta.get(OFFERED))) return 0
-  return countGuestProjects()
+// What to offer to copy into the account just signed in to: nothing if the
+// guest space is empty, or this device already asked for this account.
+export async function guestCopyOffer(): Promise<GuestCounts> {
+  if (currentSpace().kind !== 'account' || (await db.meta.get(OFFERED))) return NONE
+  return countGuestData()
 }
 
 // Records the answer so the device doesn't ask again, copying if it was
-// yes. Returns how many projects were copied.
-export async function answerGuestCopyOffer(copy: boolean): Promise<number> {
-  const copied = copy ? await copyGuestProjects() : 0
+// yes. Returns how many were copied.
+export async function answerGuestCopyOffer(copy: boolean): Promise<GuestCounts> {
+  const copied = copy ? await copyGuestData() : NONE
   await writing(() => db.meta.put({ key: OFFERED, value: new Date().toISOString() }))
   return copied
 }

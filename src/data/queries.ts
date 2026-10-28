@@ -1,5 +1,5 @@
 import { sortSubtasks } from '../lib/subtasks'
-import type { Project, Subtask } from '../types'
+import type { Idea, Project, Subtask } from '../types'
 import { db } from './db'
 import { subtasksOf } from './internal'
 
@@ -14,6 +14,12 @@ export async function getTrackerData(): Promise<TrackerData> {
     projects: await db.projects.toArray(),
     subtasks: await db.subtasks.toArray(),
   }))
+}
+
+// Kept apart from getTrackerData, so editing an idea doesn't redraw the
+// calendar.
+export async function getIdeas(): Promise<Idea[]> {
+  return db.ideas.toArray()
 }
 
 export async function getProject(id: string): Promise<Project | undefined> {

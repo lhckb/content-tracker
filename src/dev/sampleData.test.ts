@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { getTrackerData } from '../data'
+import { getIdeas, getTrackerData } from '../data'
+import { groupIdeas } from '../lib/ideas'
 import { hasOverdue } from '../lib/overdue'
 import { getProgress } from '../lib/progress'
 import { loadSampleData } from './sampleData'
@@ -27,5 +28,15 @@ describe('loadSampleData', () => {
       { title: 'Morning routine vlog', color: 'blue', archived: false, percent: 50, overdue: false },
       { title: 'Desk setup tour', color: 'orange', archived: false, percent: 0, overdue: false },
     ])
+  })
+
+  it('adds ideas to both columns, with a past month, later months and none', async () => {
+    const today = '2026-11-05'
+    await loadSampleData(today)
+    const ideas = await getIdeas()
+    const months = (platform: 'youtube' | 'instagram') =>
+      groupIdeas(ideas, platform, today).map((g) => (g.past ? `${g.month} past` : g.month))
+    expect(months('youtube')).toEqual(['2026-12', '2027-02', null])
+    expect(months('instagram')).toEqual(['2026-10 past', '2026-11', null])
   })
 })

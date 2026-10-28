@@ -3,13 +3,15 @@
 
 export * from './projects'
 export * from './subtasks'
+export * from './ideas'
 export * from './queries'
 export * from './hooks'
 export {
   answerGuestCopyOffer,
-  copyGuestProjects,
-  countGuestProjects,
+  copyGuestData,
+  countGuestData,
   guestCopyOffer,
+  type GuestCounts,
 } from './guest'
 export {
   getAccount,

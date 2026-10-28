@@ -1,4 +1,4 @@
-import type { ColorId, Platform, Project, Subtask, SubtaskKind } from '../types'
+import type { ColorId, Idea, Platform, Project, Subtask, SubtaskKind } from '../types'
 
 // The server side of sync, as rows shaped like the Postgres tables in
 // supabase/migrations (snake_case, nulls, tombstones). supabase.ts talks to
@@ -33,9 +33,22 @@ export interface SubtaskRow {
   updated_at?: string
 }
 
+export interface IdeaRow {
+  id: string
+  title: string
+  platform: Platform
+  description: string
+  month: string | null
+  created_at: string
+  deleted: boolean
+  edited_at: string
+  updated_at?: string
+}
+
 export interface Rows {
   projects: ProjectRow[]
   subtasks: SubtaskRow[]
+  ideas: IdeaRow[]
 }
 
 export interface SyncServer {
@@ -100,5 +113,29 @@ export function rowToSubtask(row: SubtaskRow): Subtask {
     done: row.done,
     notes: row.notes,
     order: row.sort_order,
+  }
+}
+
+export function ideaToRow(idea: Idea, editedAt: string, deleted: boolean): IdeaRow {
+  return {
+    id: idea.id,
+    title: idea.title,
+    platform: idea.platform,
+    description: idea.description,
+    month: idea.month ?? null,
+    created_at: idea.createdAt,
+    deleted,
+    edited_at: editedAt,
+  }
+}
+
+export function rowToIdea(row: IdeaRow): Idea {
+  return {
+    id: row.id,
+    title: row.title,
+    platform: row.platform,
+    description: row.description,
+    ...(row.month ? { month: row.month } : {}),
+    createdAt: row.created_at,
   }
 }

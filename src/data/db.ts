@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable, type Transaction } from 'dexie'
-import type { Project, Subtask } from '../types'
+import type { Idea, Project, Subtask } from '../types'
 
 // Private to src/data. Screens go through the functions exported from
 // src/data/index.ts.
@@ -15,14 +15,16 @@ export type Space = { kind: 'guest' } | { kind: 'account'; userId: string }
 export interface PendingChange {
   // `${table}:${id}`
   key: string
-  table: 'projects' | 'subtasks'
+  table: SyncedTable
   id: string
   // When this device last changed the record; the server keeps the newest.
   editedAt: string
   // Set when the record was deleted: its last values, so the delete can be
   // sent as a complete tombstone row.
-  deleted?: Project | Subtask
+  deleted?: Project | Subtask | Idea
 }
+
+export type SyncedTable = 'projects' | 'subtasks' | 'ideas'
 
 // Sync bookkeeping, such as how far this device has pulled.
 export interface MetaEntry {
@@ -33,6 +35,7 @@ export interface MetaEntry {
 export type TrackerDb = Dexie & {
   projects: EntityTable<Project, 'id'>
   subtasks: EntityTable<Subtask, 'id'>
+  ideas: EntityTable<Idea, 'id'>
   pending: EntityTable<PendingChange, 'key'>
   meta: EntityTable<MetaEntry, 'key'>
 }
@@ -48,6 +51,7 @@ function openSpaceDb(space: Space): TrackerDb {
   database.version(1).stores({ projects: 'id', subtasks: 'id, projectId' })
   database.version(2).stores({ pending: 'key' })
   database.version(3).stores({ meta: 'key' })
+  database.version(4).stores({ ideas: 'id' })
   if (space.kind === 'account') recordChanges(database)
   return database
 }
@@ -86,7 +90,7 @@ export async function deleteAccountSpace(userId: string): Promise<void> {
 // Every write runs in one of these, so the change recording below can add to
 // the pending table in the same transaction.
 export function writing<T>(fn: () => Promise<T>): Promise<T> {
-  return db.transaction('rw', [db.projects, db.subtasks, db.pending, db.meta], fn)
+  return db.transaction('rw', [db.projects, db.subtasks, db.ideas, db.pending, db.meta], fn)
 }
 
 // Transactions applying changes that came from the server, whose writes
@@ -100,11 +104,11 @@ export function applyingRemote<T>(fn: () => Promise<T>): Promise<T> {
   })
 }
 
-// In an account space, every create, update and delete of a project or
-// subtask also records a pending change, in the same transaction. Doing it
-// in Dexie's hooks means no write path can forget to.
+// In an account space, every create, update and delete of a project,
+// subtask or idea also records a pending change, in the same transaction.
+// Doing it in Dexie's hooks means no write path can forget to.
 function recordChanges(database: TrackerDb): void {
-  for (const table of ['projects', 'subtasks'] as const) {
+  for (const table of ['projects', 'subtasks', 'ideas'] as const) {
     database[table].hook('creating', (id, _record, trans) => {
       record(trans, table, String(id))
     })
@@ -121,7 +125,7 @@ function record(
   trans: Transaction,
   table: PendingChange['table'],
   id: string,
-  deleted?: Project | Subtask,
+  deleted?: Project | Subtask | Idea,
 ): void {
   if (remoteTransactions.has(trans)) return
   const change: PendingChange = {

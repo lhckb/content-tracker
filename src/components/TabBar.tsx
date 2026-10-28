@@ -1,10 +1,10 @@
 import type { ReactNode } from 'react'
 import { cx } from './cx'
 
-export type Tab = 'calendar' | 'projects'
+export type Tab = 'calendar' | 'projects' | 'ideas'
 
-// Phone width only: switches between the calendar and the project list,
-// which sit side by side on wider screens.
+// Phone width only: switches between the calendar, the project list (which
+// sit side by side on wider screens) and the ideas.
 export function TabBar({ tab, onChange }: { tab: Tab; onChange: (tab: Tab) => void }) {
   return (
     <nav
@@ -21,6 +21,10 @@ export function TabBar({ tab, onChange }: { tab: Tab; onChange: (tab: Tab) => vo
         <circle cx="4.5" cy="6.5" r="0.75" />
         <circle cx="4.5" cy="12" r="0.75" />
         <circle cx="4.5" cy="17.5" r="0.75" />
+      </TabButton>
+      <TabButton current={tab === 'ideas'} label="Ideas" onClick={() => onChange('ideas')}>
+        <path d="M12 3.5a6 6 0 0 0-3.5 10.9c.7.5 1 1.2 1 2.1h5c0-.9.3-1.6 1-2.1A6 6 0 0 0 12 3.5z" />
+        <path d="M9.75 19.25h4.5M10.75 21.5h2.5" />
       </TabButton>
     </nav>
   )

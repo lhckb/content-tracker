@@ -1,38 +1,71 @@
 import type { TrackerData } from '../../data'
-import type { ISODate } from '../../types'
+import type { ISODate, Idea } from '../../types'
+import { IdeaCard } from './IdeaCard'
 import { Modal } from './Modal'
 import { NewProjectDialog } from './NewProjectDialog'
 import { ProjectDetail } from './ProjectDetail'
 import { SubtaskCard } from './SubtaskCard'
 
-// Which card is open over the calendar. Only one is open at a time; the
-// subtask card's "Back to project" swaps it for the project detail.
+// Which card is open over the calendar or the ideas. Only one is open at a
+// time; the subtask card's "Back to project" swaps it for the project
+// detail. A new project made from an idea names it.
 export type Panel =
-  | { kind: 'new-project' }
+  | { kind: 'new-project'; ideaId?: string }
   | { kind: 'project'; id: string }
   | { kind: 'subtask'; id: string }
+  | { kind: 'idea'; id: string }
 
 export function Panels({
   panel,
   data,
+  ideas,
   today,
   onNavigate,
+  onProjectFromIdea,
   onNotice,
 }: {
   panel: Panel
   data: TrackerData
+  ideas: Idea[]
   today: ISODate
   onNavigate: (panel: Panel | null) => void
+  // A project was just made from an idea.
+  onProjectFromIdea: (projectId: string) => void
   onNotice: (message: string) => void
 }) {
   const close = () => onNavigate(null)
 
   if (panel.kind === 'new-project') {
+    const idea = panel.ideaId === undefined ? undefined : ideas.find((i) => i.id === panel.ideaId)
+    // The idea is gone, e.g. deleted on another device.
+    if (panel.ideaId !== undefined && !idea) return null
     return (
-      <Modal key="new-project" label="New project" size="small" focus="input" onClose={close}>
+      <Modal
+        key="new-project"
+        label="New project"
+        size="small"
+        focus={idea ? 'input[type="date"]' : 'input'}
+        onClose={close}
+      >
         <NewProjectDialog
+          idea={idea}
           onCancel={close}
-          onCreated={(id) => onNavigate({ kind: 'project', id })}
+          onCreated={(id) => (idea ? onProjectFromIdea(id) : onNavigate({ kind: 'project', id }))}
+        />
+      </Modal>
+    )
+  }
+
+  if (panel.kind === 'idea') {
+    const idea = ideas.find((i) => i.id === panel.id)
+    if (!idea) return null
+    return (
+      <Modal key="idea" label={idea.title} size="small" onClose={close}>
+        <IdeaCard
+          idea={idea}
+          today={today}
+          onMakeProject={() => onNavigate({ kind: 'new-project', ideaId: idea.id })}
+          onClose={close}
         />
       </Modal>
     )

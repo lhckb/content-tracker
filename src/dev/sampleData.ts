@@ -1,4 +1,5 @@
 import {
+  addIdea,
   addSubtask,
   archiveProject,
   clearAllData,
@@ -6,7 +7,9 @@ import {
   getSubtasks,
   updateSubtask,
 } from '../data'
+import { addMonthsISO, monthOf } from '../lib/calendar'
 import { addDaysISO, todayISO } from '../lib/dates'
+import { monthOfDay } from '../lib/ideas'
 import { isPublish } from '../lib/subtasks'
 import type { Platform } from '../types'
 
@@ -66,10 +69,56 @@ const SAMPLES: SampleProject[] = [
   },
 ]
 
-// Replaces everything stored with the sample projects.
+interface SampleIdea {
+  title: string
+  platform: Platform
+  description: string
+  // Months from this one; absent for no month.
+  monthIn?: number
+}
+
+// Both columns, with a month that has passed, this month, later ones and no
+// month.
+const SAMPLE_IDEAS: SampleIdea[] = [
+  {
+    title: 'Studio lighting on a budget',
+    platform: 'youtube',
+    description: 'Three setups under $100, with before and after shots.',
+    monthIn: 1,
+  },
+  { title: 'A week of meal prep', platform: 'youtube', description: '', monthIn: 3 },
+  {
+    title: 'What’s in my camera bag',
+    platform: 'youtube',
+    description: 'Only what I actually carry.\nCould be a Short as well.',
+  },
+  {
+    title: 'Sunrise run timelapse',
+    platform: 'instagram',
+    description: 'Shoot from the bridge, facing east.',
+    monthIn: -1,
+  },
+  { title: 'Desk makeover, before and after', platform: 'instagram', description: '', monthIn: 0 },
+  {
+    title: '5 stretches after leg day',
+    platform: 'instagram',
+    description: 'Carousel or Reel?',
+  },
+]
+
+// Replaces everything stored with the sample projects and ideas.
 export async function loadSampleData(today = todayISO()): Promise<void> {
   const day = (offset: number) => addDaysISO(today, offset)
+  const month = (offset: number) => monthOfDay(addMonthsISO(monthOf(today), offset))
   await clearAllData()
+  for (const idea of SAMPLE_IDEAS) {
+    await addIdea({
+      title: idea.title,
+      platform: idea.platform,
+      description: idea.description,
+      month: idea.monthIn === undefined ? undefined : month(idea.monthIn),
+    })
+  }
   for (const sample of SAMPLES) {
     const projectId = await createProject({
       title: sample.title,

@@ -64,13 +64,25 @@ The plan and its decisions are in `docs/plans/supabase-sync.md`.
   4. row-level security limits each user to their own rows.
 
   Never weaken one to make another work.
-- **Database changes are SQL migrations** in `supabase/migrations/`, reviewed in a PR. `npm run test:db` checks the access rules against a local Postgres.
+- **Database changes are SQL migrations** in `supabase/migrations/`, reviewed in a PR. `npm run test:db` checks the access rules against a local Postgres. Run a new migration in the dev project while building, and in production **before** merging the app change that needs it. Keep migrations compatible with the app version already live (e.g. a new `sync_push` argument gets a default).
 - **Keys:** the app only ever uses the publishable key. The service-role key never goes in the app, the repo or `.env.local`.
 - **Configuration:** builds without `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` (see `.env.example`) run signed-out only.
 
+## Ideas (added after the MVP)
+
+The plan and its decisions are in `docs/plans/ideas.md`.
+
+- **An area of its own:** a Calendar | Ideas switch in the top bar on desktop, an Ideas tab on the phone. Ideas never appear on the calendar, in the sidebar, in progress, or in color assignment.
+- **Data:**
+  - `src/data/ideas.ts`, with `useIdeas()` kept apart from `useTrackerData()`;
+  - a synced `ideas` table, the same in Dexie and Postgres;
+  - grouping by month in `src/lib/ideas.ts`.
+- **Make project** calls `makeProjectFromIdea`. It creates the project and deletes the idea in one `writing()` transaction, so sync never sees one without the other.
+- **Backups** are format version 2, which includes ideas. Version 1 files still import and leave ideas alone.
+
 ## Phone layout (added after the MVP)
 
-Below 768px wide (`PHONE_QUERY` in `src/hooks/useMediaQuery.ts`, Tailwind `max-md:`), the sidebar becomes a Projects tab in a bottom tab bar, cards open as full-screen sheets, and the calendar switches to `PhoneMonth`/`PhoneWeek` in `src/components/calendar/PhoneCalendar.tsx`. Touch drags start with press-and-hold. The desktop layout is unchanged, so check both widths when changing UI. The app is meant to be added to the iPhone Home Screen from Safari.
+Below 768px wide (`PHONE_QUERY` in `src/hooks/useMediaQuery.ts`, Tailwind `max-md:`), the sidebar becomes a Projects tab in a bottom tab bar (Calendar · Projects · Ideas), cards open as full-screen sheets, and the calendar switches to `PhoneMonth`/`PhoneWeek` in `src/components/calendar/PhoneCalendar.tsx`. Touch drags start with press-and-hold. The desktop layout is unchanged, so check both widths when changing UI. The app is meant to be added to the iPhone Home Screen from Safari.
 
 ## Commands
 
