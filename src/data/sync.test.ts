@@ -1,8 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { createProject, deleteProject, getProject, getSubtasks, updateProject } from '.'
+import {
+  addIdea,
+  createProject,
+  deleteIdea,
+  deleteProject,
+  getIdeas,
+  getProject,
+  getSubtasks,
+  makeProjectFromIdea,
+  updateIdea,
+  updateProject,
+} from '.'
 import { db, deleteAccountSpace, switchSpace } from './db'
 import { FakeSyncServer } from './fakeSyncServer'
-import type { ProjectRow } from './remote'
+import type { IdeaRow, ProjectRow, Rows } from './remote'
 import { getSyncStatus, startSync, type SyncEngine } from './sync'
 
 const USER = 'user-1'
@@ -25,6 +36,20 @@ function serverProject(id: string, fields: Partial<ProjectRow>): ProjectRow {
     publish_date: '2026-11-20',
     notes: '',
     archived: false,
+    deleted: false,
+    edited_at: '2026-10-27T13:00:00.000Z',
+    ...fields,
+  }
+}
+
+function serverIdea(id: string, fields: Partial<IdeaRow>): IdeaRow {
+  return {
+    id,
+    title: 'Idea from another device',
+    platform: 'youtube',
+    description: '',
+    month: null,
+    created_at: '2026-10-27T13:00:00.000Z',
     deleted: false,
     edited_at: '2026-10-27T13:00:00.000Z',
     ...fields,
@@ -133,6 +158,68 @@ describe('pulling', () => {
     expect(publish.start).toBe('2026-11-21')
     await engine.syncNow()
     expect(server.subtasks.get(publish.id)?.start_date).toBe('2026-11-21')
+  })
+})
+
+describe('ideas', () => {
+  it('sends new ideas, edits and deletes', async () => {
+    const id = await addIdea({ title: 'Studio tour', platform: 'instagram', month: '2027-03' })
+    await engine.syncNow()
+    expect(server.ideas.get(id)).toMatchObject({ title: 'Studio tour', month: '2027-03', deleted: false })
+
+    await updateIdea(id, { month: undefined, description: 'New shelves' })
+    await engine.syncNow()
+    expect(server.ideas.get(id)).toMatchObject({ month: null, description: 'New shelves' })
+
+    await deleteIdea(id)
+    await engine.syncNow()
+    expect(server.ideas.get(id)?.deleted).toBe(true)
+    expect(await db.pending.count()).toBe(0)
+  })
+
+  it('brings in another device’s ideas, and removes the ones it deleted', async () => {
+    server.editFromAnotherDevice({ ideas: [serverIdea('i-remote', { month: '2026-12' })] })
+    await engine.syncNow()
+    expect(await getIdeas()).toEqual([
+      {
+        id: 'i-remote',
+        title: 'Idea from another device',
+        platform: 'youtube',
+        description: '',
+        month: '2026-12',
+        createdAt: '2026-10-27T13:00:00.000Z',
+      },
+    ])
+    expect(await db.pending.count()).toBe(0)
+
+    server.editFromAnotherDevice({
+      ideas: [serverIdea('i-remote', { deleted: true, edited_at: '2099-01-01T00:00:00.000Z' })],
+    })
+    await engine.syncNow()
+    expect(await getIdeas()).toEqual([])
+  })
+
+  it('sends a project made from an idea and the idea’s removal in one push', async () => {
+    const ideaId = await addIdea({ title: 'Studio tour', platform: 'youtube' })
+    await engine.syncNow()
+    const batches: Rows[] = []
+    const push = server.push.bind(server)
+    server.push = async (rows) => {
+      batches.push(rows)
+      return push(rows)
+    }
+
+    const projectId = await makeProjectFromIdea(ideaId, {
+      title: 'Studio tour',
+      platform: 'youtube',
+      publishDate: '2027-03-20',
+      withDefaultSubtasks: true,
+    })
+    await engine.syncNow()
+    expect(batches).toHaveLength(1)
+    expect(batches[0].projects.map((p) => p.id)).toEqual([projectId])
+    expect(batches[0].subtasks).toHaveLength(6)
+    expect(batches[0].ideas).toMatchObject([{ id: ideaId, deleted: true }])
   })
 })
 

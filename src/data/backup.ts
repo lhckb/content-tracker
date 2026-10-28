@@ -1,15 +1,16 @@
 import { isColorId } from '../lib/colors'
 import { isISODate, todayISO } from '../lib/dates'
+import { isISOMonth } from '../lib/ideas'
 import { PLATFORMS } from '../lib/platforms'
-import type { Project, Subtask, SubtaskKind } from '../types'
+import type { Idea, Project, Subtask, SubtaskKind } from '../types'
 import { db, writing } from './db'
-import { getTrackerData } from './queries'
+import { getIdeas, getTrackerData } from './queries'
 
 const APP_ID = 'content-tracker'
 
 // Bump when the stored shape changes, and teach parseBackup to upgrade
-// files written by older versions.
-export const BACKUP_SCHEMA_VERSION = 1
+// files written by older versions. Version 2 added ideas.
+export const BACKUP_SCHEMA_VERSION = 2
 
 export interface Backup {
   app: typeof APP_ID
@@ -17,7 +18,12 @@ export interface Backup {
   exportedAt: string
   projects: Project[]
   subtasks: Subtask[]
+  ideas: Idea[]
 }
+
+// A checked file. One from before ideas existed (version 1) has no `ideas`,
+// and importing it leaves the current ones alone.
+export type ParsedBackup = Omit<Backup, 'ideas'> & { ideas?: Idea[] }
 
 // Thrown when an imported file can't be used. The message is meant to be
 // shown to the user as-is.
@@ -37,6 +43,7 @@ export async function exportBackupText(): Promise<string> {
     exportedAt: new Date().toISOString(),
     projects,
     subtasks,
+    ideas: await getIdeas(),
   }
   return JSON.stringify(backup, null, 2)
 }
@@ -45,30 +52,37 @@ export async function exportBackupText(): Promise<string> {
 // the file is rejected.
 export async function importBackupText(
   text: string,
-): Promise<{ projects: number; subtasks: number }> {
+): Promise<{ projects: number; subtasks: number; ideas: number }> {
   const backup = parseBackup(text)
+  const { ideas } = backup
   await writing(async () => {
-    await deleteEverything()
+    await deleteEverything({ ideas: ideas !== undefined })
     await db.projects.bulkAdd(backup.projects)
     await db.subtasks.bulkAdd(backup.subtasks)
+    if (ideas) await db.ideas.bulkAdd(ideas)
   })
-  return { projects: backup.projects.length, subtasks: backup.subtasks.length }
+  return {
+    projects: backup.projects.length,
+    subtasks: backup.subtasks.length,
+    ideas: ideas?.length ?? 0,
+  }
 }
 
 export async function clearAllData(): Promise<void> {
-  await writing(deleteEverything)
+  await writing(() => deleteEverything({ ideas: true }))
 }
 
 // Deletes record by record rather than with clear(), which skips Dexie's
 // hooks: in an account space each delete has to be recorded so it reaches
 // the server and the other devices.
-async function deleteEverything(): Promise<void> {
+async function deleteEverything({ ideas }: { ideas: boolean }): Promise<void> {
   await db.subtasks.toCollection().delete()
   await db.projects.toCollection().delete()
+  if (ideas) await db.ideas.toCollection().delete()
 }
 
 // Checks an untrusted file field by field and keeps only known fields.
-export function parseBackup(text: string): Backup {
+export function parseBackup(text: string): ParsedBackup {
   let data: unknown
   try {
     data = JSON.parse(text)
@@ -78,23 +92,28 @@ export function parseBackup(text: string): Backup {
   if (!isRecord(data) || data.app !== APP_ID) {
     throw new BackupError("This file isn't a Content Tracker backup.")
   }
-  if (data.schemaVersion !== BACKUP_SCHEMA_VERSION) {
+  const version = data.schemaVersion
+  if (version !== 1 && version !== BACKUP_SCHEMA_VERSION) {
     throw new BackupError(
-      `This backup uses format version ${String(data.schemaVersion)}, which this version of the app can't read.`,
+      `This backup uses format version ${String(version)}, which this version of the app can't read.`,
     )
   }
-  const { projects: rawProjects, subtasks: rawSubtasks, exportedAt } = data
+  const { projects: rawProjects, subtasks: rawSubtasks, ideas: rawIdeas, exportedAt } = data
   if (!Array.isArray(rawProjects)) damaged('no project list')
   if (!Array.isArray(rawSubtasks)) damaged('no subtask list')
+  if (version !== 1 && !Array.isArray(rawIdeas)) damaged('no idea list')
   const projects = rawProjects.map(parseProject)
   const subtasks = rawSubtasks.map(parseSubtask)
   checkConsistency(projects, subtasks)
+  const ideas = Array.isArray(rawIdeas) && version !== 1 ? rawIdeas.map(parseIdea) : undefined
+  if (ideas && new Set(ideas.map((i) => i.id)).size !== ideas.length) damaged('two ideas share an id')
   return {
     app: APP_ID,
     schemaVersion: BACKUP_SCHEMA_VERSION,
     exportedAt: typeof exportedAt === 'string' ? exportedAt : '',
     projects,
     subtasks,
+    ...(ideas ? { ideas } : {}),
   }
 }
 
@@ -130,6 +149,21 @@ function parseSubtask(value: unknown, index: number): Subtask {
   if (typeof order !== 'number' || !Number.isFinite(order)) damaged(`${where}: order`)
   const range = end === undefined || end === start ? { start } : { start, end }
   return { id, projectId, kind, title, ...range, done, notes, order }
+}
+
+function parseIdea(value: unknown, index: number): Idea {
+  const where = `idea ${index + 1}`
+  if (!isRecord(value)) damaged(where)
+  const { id, title, platform, description, month, createdAt } = value
+  if (typeof id !== 'string' || !id) damaged(`${where}: id`)
+  if (typeof title !== 'string') damaged(`${where}: title`)
+  if (!isOneOf(platform, PLATFORMS)) damaged(`${where}: platform`)
+  if (typeof description !== 'string') damaged(`${where}: description`)
+  if (month !== undefined && !isISOMonth(month)) damaged(`${where}: month`)
+  if (typeof createdAt !== 'string' || Number.isNaN(Date.parse(createdAt))) {
+    damaged(`${where}: date added`)
+  }
+  return { id, title, platform, description, ...(month === undefined ? {} : { month }), createdAt }
 }
 
 function checkConsistency(projects: Project[], subtasks: Subtask[]): void {

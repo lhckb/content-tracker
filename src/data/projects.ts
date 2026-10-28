@@ -19,6 +19,7 @@ export interface NewProject {
   platform: Platform
   publishDate: ISODate
   withDefaultSubtasks: boolean
+  notes?: string
 }
 
 // Returns the new project's id. It always gets a Publish subtask, with or
@@ -34,7 +35,7 @@ export async function createProject(input: NewProject): Promise<string> {
       platform: input.platform,
       color: pickColor(await activeColors()),
       publishDate: input.publishDate,
-      notes: '',
+      notes: input.notes ?? '',
       archived: false,
     }
     const tasks = input.withDefaultSubtasks ? defaultTasks(input.publishDate) : []

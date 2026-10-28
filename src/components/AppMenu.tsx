@@ -7,6 +7,7 @@ import {
   useAccount,
 } from '../data'
 import { loadSampleData } from '../dev/sampleData'
+import { projectsAndIdeas } from '../lib/plural'
 import { ask } from './ask'
 import { cx } from './cx'
 
@@ -64,7 +65,7 @@ export function AppMenu({
   async function confirmReplace(): Promise<boolean> {
     if (!hasData) return true
     const where = account.state === 'signed-in' ? 'in your account, on all your devices' : 'on this device'
-    return ask(`This replaces every project ${where}. Continue?`, {
+    return ask(`This replaces your projects and ideas ${where}. Continue?`, {
       confirmLabel: 'Replace',
       danger: true,
     })
@@ -77,7 +78,7 @@ export function AppMenu({
     run(async () => {
       if (!(await confirmReplace())) return ''
       const counts = await importBackupText(await file.text())
-      return `Imported ${plural(counts.projects, 'project')}.`
+      return `Imported ${projectsAndIdeas(counts)}.`
     })
   }
 
@@ -150,7 +151,7 @@ export function AppMenu({
                 danger
                 onClick={() =>
                   run(async () => {
-                    const sure = await ask('Delete every project? This can\'t be undone.', {
+                    const sure = await ask('Delete every project and idea? This can\'t be undone.', {
                       confirmLabel: 'Delete everything',
                       danger: true,
                     })
@@ -192,10 +193,6 @@ function MenuItem({
       {children}
     </button>
   )
-}
-
-function plural(count: number, noun: string): string {
-  return `${count} ${noun}${count === 1 ? '' : 's'}`
 }
 
 // On a phone, hands the backup to the share sheet ("Save to Files"), the

@@ -13,12 +13,15 @@ import {
   guestCopyOffer,
   startupSignInError,
   useAccount,
+  useIdeas,
   useTrackerData,
 } from './data'
 import { useToday } from './hooks/useToday'
+import { projectsAndIdeas } from './lib/plural'
 
 function App() {
   const data = useTrackerData()
+  const ideas = useIdeas()
   const today = useToday()
   const [panel, setPanel] = useState<Panel | null>(null)
   // Which half shows at phone width; wider screens show both side by side.
@@ -29,20 +32,22 @@ function App() {
   const account = useAccount()
   const signedInAs = account.state === 'signed-in' ? account.userId : null
 
-  // Just signed in on a device with projects made while signed out: offer,
-  // once, to add them to the account.
+  // Just signed in on a device with projects or ideas made while signed out:
+  // offer, once, to add them to the account.
   useEffect(() => {
     if (!signedInAs) return
     let current = true
-    void guestCopyOffer().then(async (count) => {
-      if (!current || count === 0) return
-      const them = count === 1 ? 'it' : 'them'
+    void guestCopyOffer().then(async (counts) => {
+      const total = counts.projects + counts.ideas
+      if (!current || total === 0) return
       const copy = await ask(
-        `This device has ${count} ${count === 1 ? 'project' : 'projects'} made while signed out. Add ${them} to your account?`,
+        `This device has ${projectsAndIdeas(counts)} made while signed out. Add ${total === 1 ? 'it' : 'them'} to your account?`,
         { confirmLabel: 'Add to account' },
       )
       const copied = await answerGuestCopyOffer(copy)
-      if (copied) setNotice(`Added ${copied} ${copied === 1 ? 'project' : 'projects'} to your account.`)
+      if (copied.projects + copied.ideas > 0) {
+        setNotice(`Added ${projectsAndIdeas(copied)} to your account.`)
+      }
     })
     return () => {
       current = false
@@ -56,7 +61,7 @@ function App() {
     // keep clear of the notch in landscape.
     <div className="flex h-dvh flex-col pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)]">
       <TopBar
-        hasData={Boolean(data?.projects.length)}
+        hasData={Boolean(data?.projects.length || ideas?.length)}
         onNewProject={() => setPanel({ kind: 'new-project' })}
         onNotice={setNotice}
       />

@@ -1,16 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
+  addIdea,
   archiveProject,
   clearAllData,
   createProject,
+  deleteIdea,
   deleteProject,
   exportBackupText,
+  getIdeas,
   getSubtasks,
   getTrackerData,
   importBackupText,
+  updateIdea,
 } from '.'
 import { applyingRemote, db, deleteAccountSpace, switchSpace } from './db'
-import { copyGuestProjects, countGuestProjects } from './guest'
+import { copyGuestData, countGuestData } from './guest'
 
 const ACCOUNT = { kind: 'account', userId: 'user-1' } as const
 
@@ -46,6 +50,14 @@ describe('spaces', () => {
     expect((await getTrackerData()).projects.map((p) => p.title)).toEqual(['Guest project'])
   })
 
+  it('keeps guest and account ideas apart', async () => {
+    await addIdea({ title: 'Guest idea', platform: 'youtube' })
+    switchSpace(ACCOUNT)
+    expect(await getIdeas()).toEqual([])
+    switchSpace({ kind: 'guest' })
+    expect((await getIdeas()).map((i) => i.title)).toEqual(['Guest idea'])
+  })
+
   it('removes an account from the device on sign-out, leaving the guest space', async () => {
     await newProject('Guest project')
     switchSpace(ACCOUNT)
@@ -58,24 +70,28 @@ describe('spaces', () => {
   })
 })
 
-describe('copying guest projects into the account', () => {
+describe('copying guest projects and ideas into the account', () => {
   it('copies them with their ids and records them for syncing', async () => {
     const id = await newProject('Made while signed out')
+    const ideaId = await addIdea({ title: 'Jotted down while signed out', platform: 'instagram' })
     switchSpace(ACCOUNT)
-    expect(await countGuestProjects()).toBe(1)
-    expect(await copyGuestProjects()).toBe(1)
+    expect(await countGuestData()).toEqual({ projects: 1, ideas: 1 })
+    expect(await copyGuestData()).toEqual({ projects: 1, ideas: 1 })
 
     expect((await getTrackerData()).projects.map((p) => p.id)).toEqual([id])
+    expect((await getIdeas()).map((i) => i.id)).toEqual([ideaId])
     expect(await pendingKeys()).toContain(`projects:${id}`)
+    expect(await pendingKeys()).toContain(`ideas:${ideaId}`)
     switchSpace({ kind: 'guest' })
     expect((await getTrackerData()).projects).toHaveLength(1)
+    expect(await getIdeas()).toHaveLength(1)
   })
 
   it('gives a copied project a free color if the account already uses its color', async () => {
     await newProject('Guest')
     switchSpace(ACCOUNT)
     await newProject('Already in the account')
-    await copyGuestProjects()
+    await copyGuestData()
     const colors = (await getTrackerData()).projects.map((p) => p.color).sort()
     expect(colors).toEqual(['blue', 'green'])
   })
@@ -112,6 +128,20 @@ describe('change recording', () => {
     expect(change?.deleted).toMatchObject({ id, title: 'Morning routine vlog' })
     const subtaskChanges = (await db.pending.toArray()).filter((p) => p.table === 'subtasks')
     expect(subtaskChanges.every((p) => p.deleted)).toBe(true)
+  })
+
+  it('records every change to an idea, keeping its last values when deleted', async () => {
+    switchSpace(ACCOUNT)
+    const id = await addIdea({ title: 'Studio tour', platform: 'youtube' })
+    expect(await pendingKeys()).toEqual([`ideas:${id}`])
+    await db.pending.clear()
+    await updateIdea(id, { description: 'Show the new shelves' })
+    expect(await pendingKeys()).toEqual([`ideas:${id}`])
+    await deleteIdea(id)
+    expect((await db.pending.get(`ideas:${id}`))?.deleted).toMatchObject({
+      id,
+      description: 'Show the new shelves',
+    })
   })
 
   it('does not record changes that came from the server', async () => {

@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import type { ProjectRow, Rows, SubtaskRow, SyncServer } from './remote'
+import type { IdeaRow, ProjectRow, Rows, SubtaskRow, SyncServer } from './remote'
 
 // The address the app was opened at, read before the client below can tidy
 // it: a refused Google sign-in comes back with its reason in the URL.
@@ -19,7 +19,7 @@ export const supabase: SupabaseClient | null =
       })
     : null
 
-// Sync against the Supabase project: sync_push for writes, the two tables
+// Sync against the Supabase project: sync_push for writes, the three tables
 // for reads, and Realtime for live announcements. Every call runs as the
 // signed-in user, under the database's access rules.
 export function supabaseServer(client: SupabaseClient): SyncServer {
@@ -28,6 +28,7 @@ export function supabaseServer(client: SupabaseClient): SyncServer {
       const { error } = await client.rpc('sync_push', {
         project_rows: rows.projects,
         subtask_rows: rows.subtasks,
+        idea_rows: rows.ideas,
       })
       if (error) throw new Error(error.message)
     },
@@ -36,6 +37,7 @@ export function supabaseServer(client: SupabaseClient): SyncServer {
       return {
         projects: await pullTable<ProjectRow>(client, 'projects', since),
         subtasks: await pullTable<SubtaskRow>(client, 'subtasks', since),
+        ideas: await pullTable<IdeaRow>(client, 'ideas', since),
       }
     },
 
@@ -44,6 +46,7 @@ export function supabaseServer(client: SupabaseClient): SyncServer {
         .channel('tracker-changes')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, onChange)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'subtasks' }, onChange)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'ideas' }, onChange)
         .subscribe()
       return () => void client.removeChannel(channel)
     },
@@ -55,7 +58,7 @@ const PAGE_SIZE = 1000
 
 async function pullTable<T>(
   client: SupabaseClient,
-  table: 'projects' | 'subtasks',
+  table: 'projects' | 'subtasks' | 'ideas',
   since: string | null,
 ): Promise<T[]> {
   const rows: T[] = []

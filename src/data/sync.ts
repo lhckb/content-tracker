@@ -1,11 +1,13 @@
 import { liveQuery } from 'dexie'
 import { useSyncExternalStore } from 'react'
 import { findRepairs } from '../lib/repairs'
-import type { Project, Subtask } from '../types'
+import type { Idea, Project, Subtask } from '../types'
 import { applyingRemote, db, writing } from './db'
 import { getTrackerData } from './queries'
 import {
+  ideaToRow,
   projectToRow,
+  rowToIdea,
   rowToProject,
   rowToSubtask,
   subtaskToRow,
@@ -168,18 +170,20 @@ export function startSync(
 async function push(server: SyncServer): Promise<void> {
   const { pending, rows } = await db.transaction(
     'r',
-    [db.projects, db.subtasks, db.pending],
+    [db.projects, db.subtasks, db.ideas, db.pending],
     async () => {
       const pending = await db.pending.toArray()
-      const rows: Rows = { projects: [], subtasks: [] }
+      const rows: Rows = { projects: [], subtasks: [], ideas: [] }
       for (const change of pending) {
         const record = change.deleted ?? (await db.table(change.table).get(change.id))
         if (!record) continue
         const deleted = change.deleted !== undefined
         if (change.table === 'projects') {
           rows.projects.push(projectToRow(record as Project, change.editedAt, deleted))
-        } else {
+        } else if (change.table === 'subtasks') {
           rows.subtasks.push(subtaskToRow(record as Subtask, change.editedAt, deleted))
+        } else {
+          rows.ideas.push(ideaToRow(record as Idea, change.editedAt, deleted))
         }
       }
       return { pending, rows }
@@ -204,7 +208,7 @@ async function pull(server: SyncServer): Promise<void> {
     ? new Date(Date.parse(pulledUntil) - PULL_OVERLAP_MS).toISOString()
     : null
   const rows = await server.pull(since)
-  if (rows.projects.length === 0 && rows.subtasks.length === 0) return
+  if (rows.projects.length === 0 && rows.subtasks.length === 0 && rows.ideas.length === 0) return
 
   await applyingRemote(async () => {
     const waiting = new Set(await db.pending.toCollection().primaryKeys())
@@ -218,8 +222,13 @@ async function pull(server: SyncServer): Promise<void> {
       if (row.deleted) await db.subtasks.delete(row.id)
       else await db.subtasks.put(rowToSubtask(row))
     }
+    for (const row of rows.ideas) {
+      if (waiting.has(`ideas:${row.id}`)) continue
+      if (row.deleted) await db.ideas.delete(row.id)
+      else await db.ideas.put(rowToIdea(row))
+    }
     let newest = pulledUntil ?? ''
-    for (const { updated_at } of [...rows.projects, ...rows.subtasks]) {
+    for (const { updated_at } of [...rows.projects, ...rows.subtasks, ...rows.ideas]) {
       if (updated_at && (!newest || Date.parse(updated_at) > Date.parse(newest))) newest = updated_at
     }
     if (newest) await db.meta.put({ key: PULLED_UNTIL, value: newest })

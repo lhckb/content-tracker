@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
+  addIdea,
   addSubtask,
   archiveProject,
   BackupError,
@@ -8,6 +9,7 @@ import {
   deleteProject,
   deleteSubtask,
   exportBackupText,
+  getIdeas,
   getProject,
   getSubtasks,
   getTrackerData,
@@ -247,16 +249,42 @@ describe('backup', () => {
       end: '2026-11-12',
     })
     await archiveProject(await newProject({ title: 'Old one', platform: 'instagram' }))
+    await addIdea({ title: 'Studio tour', platform: 'youtube', month: '2027-03' })
+    await addIdea({ title: 'Sunrise timelapse', platform: 'instagram', description: 'From the bridge' })
     const before = await getTrackerData()
+    const ideasBefore = await getIdeas()
 
     const text = await exportBackupText()
     await clearAllData()
-    expect(await importBackupText(text)).toEqual({ projects: 2, subtasks: 12 })
+    expect(await importBackupText(text)).toEqual({ projects: 2, subtasks: 12, ideas: 2 })
 
     const after = await getTrackerData()
     const byId = <T extends { id: string }>(a: T, b: T) => a.id.localeCompare(b.id)
     expect(after.projects.sort(byId)).toEqual(before.projects.sort(byId))
     expect(after.subtasks.sort(byId)).toEqual(before.subtasks.sort(byId))
+    expect((await getIdeas()).sort(byId)).toEqual(ideasBefore.sort(byId))
+  })
+
+  it('imports a file from before ideas existed, leaving the current ideas alone', async () => {
+    await newProject({ title: 'In the old backup' })
+    const old = JSON.parse(await exportBackupText())
+    old.schemaVersion = 1
+    delete old.ideas
+    await clearAllData()
+    await newProject({ title: 'Replaced' })
+    await addIdea({ title: 'Kept', platform: 'youtube' })
+
+    expect(await importBackupText(JSON.stringify(old))).toEqual({ projects: 1, subtasks: 6, ideas: 0 })
+    expect((await getTrackerData()).projects.map((p) => p.title)).toEqual(['In the old backup'])
+    expect((await getIdeas()).map((i) => i.title)).toEqual(['Kept'])
+  })
+
+  it('rejects an idea with a malformed month', async () => {
+    await addIdea({ title: 'Studio tour', platform: 'youtube' })
+    const backup = JSON.parse(await exportBackupText())
+    backup.ideas[0].month = 'March 2027'
+    await expect(importBackupText(JSON.stringify(backup))).rejects.toThrow(/idea 1: month/)
+    expect(await getIdeas()).toHaveLength(1)
   })
 
   it('rejects a bad file and keeps the current data', async () => {
@@ -275,7 +303,7 @@ describe('backup', () => {
 
   it('refuses files from a newer version of the app', async () => {
     const backup = JSON.parse(await exportBackupText())
-    backup.schemaVersion = 2
-    await expect(importBackupText(JSON.stringify(backup))).rejects.toThrow(/version 2/)
+    backup.schemaVersion = 3
+    await expect(importBackupText(JSON.stringify(backup))).rejects.toThrow(/version 3/)
   })
 })

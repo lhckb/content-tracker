@@ -42,3 +42,18 @@ export interface Subtask {
 }
 
 export type DateRange = Pick<Subtask, 'start' | 'end'>
+
+// A calendar month as 'YYYY-MM', with no day.
+export type ISOMonth = string
+
+// A video idea, kept apart from the calendar until it's made into a project.
+export interface Idea {
+  id: string
+  title: string
+  platform: Platform
+  description: string
+  // The month to work on it. Absent when not set.
+  month?: ISOMonth
+  // When it was added (an ISO time), for ordering within a month.
+  createdAt: string
+}

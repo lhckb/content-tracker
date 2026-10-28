@@ -1,4 +1,4 @@
-import type { ProjectRow, Rows, SubtaskRow, SyncServer } from './remote'
+import type { IdeaRow, ProjectRow, Rows, SubtaskRow, SyncServer } from './remote'
 
 // An in-memory stand-in for the Supabase side of sync, for tests. It follows
 // the same rules as supabase/migrations: the newer edit of each record wins,
@@ -6,6 +6,7 @@ import type { ProjectRow, Rows, SubtaskRow, SyncServer } from './remote'
 export class FakeSyncServer implements SyncServer {
   projects = new Map<string, ProjectRow>()
   subtasks = new Map<string, SubtaskRow>()
+  ideas = new Map<string, IdeaRow>()
   // While true, every call fails the way fetch does with no connection.
   unreachable = false
   // The `since` each pull asked for, oldest first.
@@ -21,6 +22,7 @@ export class FakeSyncServer implements SyncServer {
     if (this.pushGate) await this.pushGate
     for (const row of rows.projects) this.store(this.projects, row)
     for (const row of rows.subtasks) this.store(this.subtasks, row)
+    for (const row of rows.ideas) this.store(this.ideas, row)
     this.announce()
   }
 
@@ -29,7 +31,11 @@ export class FakeSyncServer implements SyncServer {
     this.pulls.push(since)
     const changed = <T extends { updated_at?: string }>(rows: Map<string, T>) =>
       [...rows.values()].filter((row) => since === null || (row.updated_at ?? '') > since)
-    return { projects: changed(this.projects), subtasks: changed(this.subtasks) }
+    return {
+      projects: changed(this.projects),
+      subtasks: changed(this.subtasks),
+      ideas: changed(this.ideas),
+    }
   }
 
   subscribe(onChange: () => void): () => void {
@@ -41,6 +47,7 @@ export class FakeSyncServer implements SyncServer {
   editFromAnotherDevice(rows: Partial<Rows>): void {
     for (const row of rows.projects ?? []) this.store(this.projects, row)
     for (const row of rows.subtasks ?? []) this.store(this.subtasks, row)
+    for (const row of rows.ideas ?? []) this.store(this.ideas, row)
     this.announce()
   }
 
