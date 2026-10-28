@@ -21,6 +21,41 @@ The scripts were throwaway and not committed; their steps are written out below.
 
 ## Branch `ideas`: the Ideas area (2026-10-28)
 
+### T-16 · Ideas syncing between three browsers on the dev project · ✅
+- **Where:** the dev server with `.env.local` pointing at the dev project, after you ran the ideas migration there. Three separate headless Chromium profiles (A, B, C) stand in for three devices; A and B are signed in as the test user from the start.
+- **How and result:**
+
+  | Step | Result |
+  | --- | --- |
+  | A adds an idea in YouTube | B shows it after **2.3 s** |
+  | B sets February and a description on it | A shows it under February 2027, with the description, after **2.3 s** |
+  | A uses Make project on it and creates the project | A moves to the calendar; B drops the idea after **1.8 s**, and B's copy of the project has the description as its notes |
+  | C, signed out, adds an Instagram idea, then signs in | C is asked "This device has 1 idea made while signed out. Add it to your account?"; after Add to account, A shows it after **2.3 s** |
+  | A deletes the project and the idea | C drops the idea after **1.8 s**, and the project too |
+
+- No console errors.
+- **First run:** the script failed partway, its own mistake. It waited for A's Ideas column right after Make project, when A had moved to the calendar as designed. Fixed: the script switches back to Ideas first, and now cleans up every test project and idea, including those the first run left.
+- **Afterwards:** through the API, the test account had no live projects or ideas, only tombstones. One live subtask was left over from yesterday's T-04 probe: that probe deleted its "Probe" project through the API but not the project's Publish subtask, something the app never does. It would have made an exported backup refuse to import ("belongs to no project"), so it was tombstoned too. The test account now has 0 live rows.
+
+### T-15 · The ideas migration on the dev project, through the API · ✅
+- **Where:** the dev project, with the publishable key only; signed out, then as the test user.
+- **How:** a Node script, the same way as T-04 and T-05. The idea it stores ends as a tombstone.
+- **Result:**
+
+  | Check | Result |
+  | --- | --- |
+  | Signed out: read `ideas` | ✅ refused (`42501`) |
+  | Signed out: call `sync_push` | ✅ refused (`42501`) |
+  | The previous app's two-list `sync_push` call | ✅ still works |
+  | Push an idea with a month | ✅ stored with the test user's id; `updated_at` set by the server |
+  | Push an older edit | ✅ ignored |
+  | Push a newer edit that clears the month | ✅ applied; month null |
+  | Push a month of "March 2027" | ✅ refused (`23514`, the month check) |
+  | Hard delete through the table API | ✅ refused (`42501`) |
+  | Other users' ideas visible | ✅ none |
+  | Live update on `ideas` (after "Subscribed to PostgreSQL") | ✅ heard the `UPDATE` |
+  | The probe idea at the end | ✅ a tombstone |
+
 ### T-14 · Ideas on the phone · ✅
 - **Where:** the dev server, signed out, in WebKit emulating an iPhone 15, with the sample data.
 - **How:**
