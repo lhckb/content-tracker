@@ -1,4 +1,4 @@
-import { isPublish, lastDay, normalizeRange } from '../lib/subtasks'
+import { isCleanup, isPublish, lastDay, normalizeRange } from '../lib/subtasks'
 import type { DateRange, ISODate, Project, Subtask } from '../types'
 import { db, writing } from './db'
 import {
@@ -9,7 +9,8 @@ import {
   writePublishDate,
 } from './internal'
 
-// Returned instead of saving when a subtask would end after its publish date.
+// Returned instead of saving when a task would end after its publish date.
+// Clean-up tasks are exempt.
 export interface EndsAfterPublish {
   ok: false
   reason: 'ends-after-publish'
@@ -27,6 +28,8 @@ export interface NewSubtask {
   title: string
   start: ISODate
   end?: ISODate
+  // A regular task unless given.
+  kind?: 'task' | 'cleanup'
 }
 
 export type AddSubtaskResult = { ok: true; id: string } | EndsAfterPublish
@@ -40,11 +43,12 @@ export async function addSubtask(
   return writing(
     async (): Promise<AddSubtaskResult> => {
       const project = await requireProject(projectId)
-      const refusal = await applyGuardRail(project, range, options)
+      const kind = input.kind ?? 'task'
+      const refusal = kind === 'cleanup' ? null : await applyGuardRail(project, range, options)
       if (refusal) return refusal
       const existing = await subtasksOf(projectId).toArray()
       const order = Math.max(-1, ...existing.map((s) => s.order)) + 1
-      const subtask = newSubtask(projectId, { title: input.title.trim(), ...range, order })
+      const subtask = newSubtask(projectId, { title: input.title.trim(), ...range, order, kind })
       await db.subtasks.add(subtask)
       return { ok: true, id: subtask.id }
     },
@@ -68,7 +72,7 @@ export async function moveSubtask(
         throw new Error('Move the Publish subtask with setPublishDate')
       }
       const project = await requireProject(subtask.projectId)
-      const refusal = await applyGuardRail(project, range, options)
+      const refusal = isCleanup(subtask) ? null : await applyGuardRail(project, range, options)
       if (refusal) return refusal
       // Dexie deletes a property that is set to undefined, which is how a
       // range turns back into a single day.
@@ -81,8 +85,9 @@ export async function moveSubtask(
 export type SubtaskPatch = Partial<Pick<Subtask, 'title' | 'notes' | 'done'>>
 
 // Ticking Publish means the video is out, so it also ticks every other
-// subtask of the project and progress reaches 100%. Unticking Publish
-// leaves the others as they are.
+// task of the project and progress reaches 100%. Clean-up tasks are the
+// work still to come, so they stay as they are. Unticking Publish leaves
+// the others as they are.
 export async function updateSubtask(id: string, patch: SubtaskPatch): Promise<void> {
   await writing(async () => {
     const subtask = await requireSubtask(id)
@@ -91,9 +96,35 @@ export async function updateSubtask(id: string, patch: SubtaskPatch): Promise<vo
     }
     await db.subtasks.update(id, patch)
     if (patch.done && isPublish(subtask)) {
-      await subtasksOf(subtask.projectId).modify({ done: true })
+      await subtasksOf(subtask.projectId)
+        .filter((s) => s.kind === 'task')
+        .modify({ done: true })
     }
   })
+}
+
+export type SetCleanupResult = { ok: true } | EndsAfterPublish
+
+// Turns a task into a clean-up task, or back. Turning one back brings the
+// guard rail with it, as moving it would.
+export async function setCleanup(
+  id: string,
+  cleanup: boolean,
+  options: GuardRailOptions = {},
+): Promise<SetCleanupResult> {
+  return writing(
+    async (): Promise<SetCleanupResult> => {
+      const subtask = await requireSubtask(id)
+      if (isPublish(subtask)) throw new Error("The Publish subtask can't be a clean-up task")
+      if (!cleanup) {
+        const project = await requireProject(subtask.projectId)
+        const refusal = await applyGuardRail(project, subtask, options)
+        if (refusal) return refusal
+      }
+      await db.subtasks.update(id, { kind: cleanup ? 'cleanup' : 'task' })
+      return { ok: true }
+    },
+  )
 }
 
 export async function deleteSubtask(id: string): Promise<void> {

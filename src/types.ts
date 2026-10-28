@@ -25,8 +25,11 @@ export interface Project {
   archived: boolean
 }
 
-// Every project has exactly one 'publish' subtask, sitting on its publish date.
-export type SubtaskKind = 'task' | 'publish'
+// Every project has exactly one 'publish' subtask, sitting on its publish
+// date. 'cleanup' subtasks are the work after the video is out: they don't
+// count toward progress, aren't ticked by Publish, and may fall after the
+// publish date.
+export type SubtaskKind = 'task' | 'publish' | 'cleanup'
 
 export interface Subtask {
   id: string

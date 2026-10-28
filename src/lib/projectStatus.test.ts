@@ -4,19 +4,32 @@ import { hasOverdue, isOverdue } from './overdue'
 import { getProgress } from './progress'
 import { shiftRange } from './shift'
 import { getProjectSpan } from './span'
-import { defaultTasks } from './template'
+import { cleanupProgress, isWrappingUp } from './cleanup'
+import { defaultCleanupTasks, defaultTasks } from './template'
 import type { Subtask } from '../types'
 
 const TODAY = '2026-11-05'
 
 describe('getProgress', () => {
   it('weights every subtask equally and rounds the percentage', () => {
-    expect(getProgress([{ done: true }, { done: false }, { done: false }])).toEqual({
-      done: 1,
-      total: 3,
-      percent: 33,
-    })
+    expect(
+      getProgress([
+        { done: true, kind: 'task' },
+        { done: false, kind: 'task' },
+        { done: false, kind: 'publish' },
+      ]),
+    ).toEqual({ done: 1, total: 3, percent: 33 })
     expect(getProgress([])).toEqual({ done: 0, total: 0, percent: 0 })
+  })
+
+  it('leaves clean-up tasks out', () => {
+    expect(
+      getProgress([
+        { done: true, kind: 'task' },
+        { done: true, kind: 'publish' },
+        { done: false, kind: 'cleanup' },
+      ]),
+    ).toEqual({ done: 2, total: 2, percent: 100 })
   })
 })
 
@@ -39,11 +52,29 @@ describe('overdue', () => {
 describe('getProjectSpan', () => {
   it('runs from the earliest subtask to the publish date', () => {
     const span = getProjectSpan({ publishDate: '2026-11-14' }, [
-      { start: '2026-11-04' },
-      { start: '2026-11-02' },
-      { start: '2026-11-14' },
+      { start: '2026-11-04', kind: 'task' },
+      { start: '2026-11-02', kind: 'task' },
+      { start: '2026-11-14', kind: 'publish' },
     ])
-    expect(span).toEqual({ start: '2026-11-02', end: '2026-11-14' })
+    expect(span).toEqual({ start: '2026-11-02', end: '2026-11-14', publishDate: '2026-11-14' })
+  })
+
+  it('carries on past the publish date to the last clean-up day', () => {
+    const span = getProjectSpan({ publishDate: '2026-11-14' }, [
+      { start: '2026-11-10', kind: 'task' },
+      { start: '2026-11-14', kind: 'publish' },
+      { start: '2026-11-15', end: '2026-11-17', kind: 'cleanup' },
+      { start: '2026-11-16', kind: 'cleanup' },
+    ])
+    expect(span).toEqual({ start: '2026-11-10', end: '2026-11-17', publishDate: '2026-11-14' })
+  })
+
+  it('starts at a clean-up task before everything else', () => {
+    const span = getProjectSpan({ publishDate: '2026-11-14' }, [
+      { start: '2026-11-01', kind: 'cleanup' },
+      { start: '2026-11-14', kind: 'publish' },
+    ])
+    expect(span).toEqual({ start: '2026-11-01', end: '2026-11-14', publishDate: '2026-11-14' })
   })
 })
 
@@ -69,6 +100,35 @@ describe('colors', () => {
     expect(isColorAvailable('green', ['blue'])).toBe(true)
     expect(isColorAvailable('blue', ['blue'])).toBe(false)
     expect(isColorAvailable('blue', [...COLOR_IDS])).toBe(true)
+  })
+})
+
+describe('clean-up', () => {
+  it('is wrapping up once Publish is ticked, until archived', () => {
+    const subtasks = [
+      { kind: 'publish', done: true },
+      { kind: 'cleanup', done: false },
+    ] as const
+    expect(isWrappingUp({ archived: false }, subtasks)).toBe(true)
+    expect(isWrappingUp({ archived: true }, subtasks)).toBe(false)
+    expect(isWrappingUp({ archived: false }, [{ kind: 'publish', done: false }])).toBe(false)
+  })
+
+  it('counts clean-up tasks only', () => {
+    expect(
+      cleanupProgress([
+        { kind: 'task', done: false },
+        { kind: 'cleanup', done: true },
+        { kind: 'cleanup', done: false },
+      ]),
+    ).toEqual({ done: 1, total: 2 })
+  })
+
+  it('starts the default clean-up tasks the day after publish', () => {
+    expect(defaultCleanupTasks('2026-11-14')).toEqual([
+      { title: 'Back up raw footage', start: '2026-11-15' },
+      { title: 'Share on Instagram Stories', start: '2026-11-15' },
+    ])
   })
 })
 

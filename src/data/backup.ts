@@ -9,8 +9,9 @@ import { getIdeas, getTrackerData } from './queries'
 const APP_ID = 'content-tracker'
 
 // Bump when the stored shape changes, and teach parseBackup to upgrade
-// files written by older versions. Version 2 added ideas.
-export const BACKUP_SCHEMA_VERSION = 2
+// files written by older versions. Version 2 added ideas; version 3,
+// clean-up tasks (which an older app would read as damaged).
+export const BACKUP_SCHEMA_VERSION = 3
 
 export interface Backup {
   app: typeof APP_ID
@@ -93,7 +94,7 @@ export function parseBackup(text: string): ParsedBackup {
     throw new BackupError("This file isn't a Content Tracker backup.")
   }
   const version = data.schemaVersion
-  if (version !== 1 && version !== BACKUP_SCHEMA_VERSION) {
+  if (version !== 1 && version !== 2 && version !== BACKUP_SCHEMA_VERSION) {
     throw new BackupError(
       `This backup uses format version ${String(version)}, which this version of the app can't read.`,
     )
@@ -117,7 +118,7 @@ export function parseBackup(text: string): ParsedBackup {
   }
 }
 
-const SUBTASK_KINDS: readonly SubtaskKind[] = ['task', 'publish']
+const SUBTASK_KINDS: readonly SubtaskKind[] = ['task', 'publish', 'cleanup']
 
 function parseProject(value: unknown, index: number): Project {
   const where = `project ${index + 1}`

@@ -121,6 +121,16 @@ function recordChanges(database: TrackerDb): void {
   }
 }
 
+// Strictly increasing on this device. Two changes in the same millisecond
+// would otherwise tie, and the server keeps the copy it has on a tie, so the
+// second change would be lost.
+let lastEditedAt = 0
+
+function nextEditedAt(): string {
+  lastEditedAt = Math.max(Date.now(), lastEditedAt + 1)
+  return new Date(lastEditedAt).toISOString()
+}
+
 function record(
   trans: Transaction,
   table: PendingChange['table'],
@@ -132,7 +142,7 @@ function record(
     key: `${table}:${id}`,
     table,
     id,
-    editedAt: new Date().toISOString(),
+    editedAt: nextEditedAt(),
     ...(deleted ? { deleted } : {}),
   }
   void trans.table('pending').put(change)

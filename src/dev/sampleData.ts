@@ -13,17 +13,27 @@ import { monthOfDay } from '../lib/ideas'
 import { isPublish } from '../lib/subtasks'
 import type { Platform } from '../types'
 
+interface SampleTask {
+  title: string
+  start: number
+  end?: number
+  done?: boolean
+}
+
 interface SampleProject {
   title: string
   platform: Platform
   // Day offsets from today.
   publishIn: number
-  tasks: { title: string; start: number; end?: number; done?: boolean }[]
-  published?: boolean
+  tasks: SampleTask[]
+  cleanup?: SampleTask[]
+  // Publish ticked and the project archived, or only ticked (wrapping up).
+  published?: 'archived' | 'wrapping-up'
 }
 
 // Modeled on the spec's calendar mockup and placed around today, so done,
-// overdue, multi-day and archived subtasks all show up whatever the date.
+// overdue, multi-day, clean-up, wrapping-up and archived subtasks all show
+// up whatever the date.
 const SAMPLES: SampleProject[] = [
   {
     title: 'Morning routine vlog',
@@ -36,6 +46,7 @@ const SAMPLES: SampleProject[] = [
       { title: 'Edit', start: 0, end: 1 },
       { title: 'Thumbnail', start: 6 },
     ],
+    cleanup: [{ title: 'Back up raw footage', start: 10 }],
   },
   {
     title: 'Gym Reel: leg day',
@@ -60,11 +71,26 @@ const SAMPLES: SampleProject[] = [
     title: 'Coffee grinder review',
     platform: 'youtube',
     publishIn: -4,
-    published: true,
+    published: 'archived',
     tasks: [
       { title: 'Script', start: -12, done: true },
       { title: 'A-roll', start: -10, done: true },
       { title: 'Edit', start: -8, end: -6, done: true },
+    ],
+  },
+  {
+    title: 'Packing tips Reel',
+    platform: 'instagram',
+    publishIn: -3,
+    published: 'wrapping-up',
+    tasks: [
+      { title: 'Script', start: -7, done: true },
+      { title: 'Edit', start: -5, end: -4, done: true },
+    ],
+    cleanup: [
+      { title: 'Share on Instagram Stories', start: -2, done: true },
+      { title: 'Back up raw footage', start: -1 },
+      { title: 'Reply to comments', start: 1, end: 2 },
     ],
   },
 ]
@@ -126,11 +152,16 @@ export async function loadSampleData(today = todayISO()): Promise<void> {
       publishDate: day(sample.publishIn),
       withDefaultSubtasks: false,
     })
-    for (const task of sample.tasks) {
+    const tasks = [
+      ...sample.tasks.map((task) => ({ ...task, kind: 'task' as const })),
+      ...(sample.cleanup ?? []).map((task) => ({ ...task, kind: 'cleanup' as const })),
+    ]
+    for (const task of tasks) {
       const result = await addSubtask(projectId, {
         title: task.title,
         start: day(task.start),
         end: task.end === undefined ? undefined : day(task.end),
+        kind: task.kind,
       })
       if (!result.ok) throw new Error(`Sample task ${task.title} ends after publish`)
       if (task.done) await updateSubtask(result.id, { done: true })
@@ -138,7 +169,7 @@ export async function loadSampleData(today = todayISO()): Promise<void> {
     if (sample.published) {
       const publish = (await getSubtasks(projectId)).find(isPublish)
       if (publish) await updateSubtask(publish.id, { done: true })
-      await archiveProject(projectId)
+      if (sample.published === 'archived') await archiveProject(projectId)
     }
   }
 }

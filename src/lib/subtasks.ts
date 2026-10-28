@@ -9,6 +9,10 @@ export function isPublish(subtask: Pick<Subtask, 'kind'>): boolean {
   return subtask.kind === 'publish'
 }
 
+export function isCleanup(subtask: Pick<Subtask, 'kind'>): boolean {
+  return subtask.kind === 'cleanup'
+}
+
 export function includesDay(range: DateRange, day: ISODate): boolean {
   return range.start <= day && day <= lastDay(range)
 }
@@ -25,11 +29,14 @@ export function normalizeRange(start: ISODate, end?: ISODate): DateRange {
   return { start, end }
 }
 
-// List order in the project detail: by date, Publish always last, and
-// `order` breaks ties between subtasks on the same days.
+// List order in the project detail: tasks by date, then Publish, then
+// clean-up tasks by date. `order` breaks ties between subtasks on the same
+// days.
+const KIND_ORDER: Record<Subtask['kind'], number> = { task: 0, publish: 1, cleanup: 2 }
+
 export function sortSubtasks(subtasks: readonly Subtask[]): Subtask[] {
   return [...subtasks].sort((a, b) => {
-    if (isPublish(a) !== isPublish(b)) return isPublish(a) ? 1 : -1
+    if (a.kind !== b.kind) return KIND_ORDER[a.kind] - KIND_ORDER[b.kind]
     if (a.start !== b.start) return a.start < b.start ? -1 : 1
     if (lastDay(a) !== lastDay(b)) return lastDay(a) < lastDay(b) ? -1 : 1
     return a.order - b.order
@@ -46,7 +53,8 @@ export function groupByProject(subtasks: readonly Subtask[]): Map<string, Subtas
   return groups
 }
 
-// Guard rail: a subtask can't end after its project's publish date.
+// Guard rail: a task can't end after its project's publish date. Clean-up
+// tasks are exempt.
 export function endsAfter(range: DateRange, publishDate: ISODate): boolean {
   return lastDay(range) > publishDate
 }
@@ -57,5 +65,5 @@ export function tasksEndingAfter(
   subtasks: readonly Subtask[],
   publishDate: ISODate,
 ): Subtask[] {
-  return subtasks.filter((s) => !isPublish(s) && endsAfter(s, publishDate))
+  return subtasks.filter((s) => s.kind === 'task' && endsAfter(s, publishDate))
 }

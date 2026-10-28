@@ -53,6 +53,7 @@ describe('CalendarView', () => {
       'Edit, Nov 5–6',
       'Thumbnail, Nov 11',
       'Publish, Nov 14',
+      'Back up raw footage, Nov 15',
     ])
     expect(html()).toContain('Edit · 2 days')
     expect(html()).toContain('Script ✓')
@@ -60,7 +61,8 @@ describe('CalendarView', () => {
 
   it('outlines overdue chips in red', () => {
     expect(chipTag(html(), 'Gym Reel: leg day: B-roll, Nov 4, overdue')).toContain('border-red-600')
-    expect(html().match(/border-red-600/g)).toHaveLength(1)
+    expect(chipTag(html(), 'Packing tips Reel: Back up raw footage, Nov 4, overdue')).toContain('border-red-600')
+    expect(html().match(/border-red-600/g)).toHaveLength(2)
   })
 
   it('draws archived projects in gray', () => {
@@ -80,6 +82,7 @@ describe('Sidebar', () => {
     expect(positions).toEqual([...positions].sort((a, b) => a - b))
     expect(html()).toContain('Instagram · publish Nov 10')
     expect(html().match(/aria-valuenow="(\d+)"/g)).toEqual([
+      'aria-valuenow="100"',
       'aria-valuenow="25"',
       'aria-valuenow="50"',
       'aria-valuenow="0"',
@@ -87,7 +90,7 @@ describe('Sidebar', () => {
   })
 
   it('puts a red dot on projects with overdue subtasks only', () => {
-    expect(html().match(/aria-label="Has overdue subtasks"/g)).toHaveLength(1)
+    expect(html().match(/aria-label="Has overdue subtasks"/g)).toHaveLength(2)
   })
 
   it('keeps the archive collapsed with a count', () => {

@@ -15,3 +15,10 @@ export function defaultTasks(publishDate: ISODate): { title: string; start: ISOD
     start: addDaysISO(publishDate, i - count),
   }))
 }
+
+export const DEFAULT_CLEANUP_TITLES = ['Back up raw footage', 'Share on Instagram Stories']
+
+// Clean-up tasks for a new project, all on the day after the publish date.
+export function defaultCleanupTasks(publishDate: ISODate): { title: string; start: ISODate }[] {
+  return DEFAULT_CLEANUP_TITLES.map((title) => ({ title, start: addDaysISO(publishDate, 1) }))
+}

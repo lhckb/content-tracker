@@ -16,6 +16,7 @@ import {
   importBackupText,
   moveSubtask,
   restoreProject,
+  setCleanup,
   setProjectColor,
   setPublishDate,
   shiftProject,
@@ -303,7 +304,80 @@ describe('backup', () => {
 
   it('refuses files from a newer version of the app', async () => {
     const backup = JSON.parse(await exportBackupText())
-    backup.schemaVersion = 3
-    await expect(importBackupText(JSON.stringify(backup))).rejects.toThrow(/version 3/)
+    backup.schemaVersion = 4
+    await expect(importBackupText(JSON.stringify(backup))).rejects.toThrow(/version 4/)
+  })
+
+  it('round-trips clean-up tasks, and still imports a version 2 file', async () => {
+    const id = await newProject({ withDefaultCleanup: true })
+    const text = await exportBackupText()
+    expect(JSON.parse(text).schemaVersion).toBe(3)
+    await clearAllData()
+    await importBackupText(text)
+    expect((await getSubtasks(id)).filter((s) => s.kind === 'cleanup')).toHaveLength(2)
+
+    const v2 = JSON.parse(await exportBackupText())
+    v2.schemaVersion = 2
+    v2.subtasks = v2.subtasks.filter((s: { kind: string }) => s.kind !== 'cleanup')
+    await importBackupText(JSON.stringify(v2))
+    expect(await getSubtasks(id)).toHaveLength(6)
+  })
+})
+
+describe('clean-up tasks', () => {
+  async function cleanupNamed(projectId: string, title: string) {
+    const found = await subtaskNamed(projectId, title)
+    expect(found.kind).toBe('cleanup')
+    return found
+  }
+
+  it('come with a new project when asked, the day after publish, after Publish', async () => {
+    const id = await newProject({ withDefaultCleanup: true })
+    const titles = (await getSubtasks(id)).map((s) => `${s.title} ${s.kind} ${s.start}`)
+    expect(titles.slice(-3)).toEqual([
+      'Publish publish 2026-11-14',
+      'Back up raw footage cleanup 2026-11-15',
+      'Share on Instagram Stories cleanup 2026-11-15',
+    ])
+    expect(await getSubtasks(await newProject())).toHaveLength(6)
+  })
+
+  it('can be added and moved after the publish date without the guard rail', async () => {
+    const id = await newProject()
+    const added = await addSubtask(id, { title: 'Reply to comments', start: '2026-11-20', kind: 'cleanup' })
+    expect(added.ok).toBe(true)
+    if (!added.ok) return
+    expect(await moveSubtask(added.id, { start: '2026-11-21', end: '2026-11-23' })).toEqual({ ok: true })
+    expect((await getProject(id))?.publishDate).toBe(PUBLISH)
+  })
+
+  it("don't block moving the publish date, which leaves them where they are", async () => {
+    const id = await newProject({ withDefaultCleanup: true })
+    expect(await setPublishDate(id, '2026-11-20')).toEqual({ ok: true })
+    expect((await cleanupNamed(id, 'Back up raw footage')).start).toBe('2026-11-15')
+  })
+
+  it('move with Shift project', async () => {
+    const id = await newProject({ withDefaultCleanup: true })
+    await shiftProject(id, 3)
+    expect((await cleanupNamed(id, 'Back up raw footage')).start).toBe('2026-11-18')
+  })
+
+  it('stay as they are when Publish is ticked', async () => {
+    const id = await newProject({ withDefaultCleanup: true })
+    await updateSubtask((await subtaskNamed(id, 'Publish')).id, { done: true })
+    const subtasks = await getSubtasks(id)
+    expect(subtasks.filter((s) => s.kind !== 'cleanup').every((s) => s.done)).toBe(true)
+    expect(subtasks.filter((s) => s.kind === 'cleanup').some((s) => s.done)).toBe(false)
+  })
+
+  it('switch to a regular task only within the guard rail, unless the publish date is pushed', async () => {
+    const id = await newProject({ withDefaultCleanup: true })
+    const backup = await cleanupNamed(id, 'Back up raw footage')
+    expect(await setCleanup(backup.id, false)).toMatchObject({ ok: false, endsOn: '2026-11-15' })
+    expect(await setCleanup(backup.id, false, { pushPublishDate: true })).toEqual({ ok: true })
+    expect((await subtaskNamed(id, 'Back up raw footage')).kind).toBe('task')
+    expect((await getProject(id))?.publishDate).toBe('2026-11-15')
+    await expect(setCleanup((await subtaskNamed(id, 'Publish')).id, true)).rejects.toThrow()
   })
 })

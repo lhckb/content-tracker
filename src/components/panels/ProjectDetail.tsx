@@ -65,10 +65,9 @@ export function ProjectDetail({
   }
 
   async function toggle(subtask: Subtask, done: boolean) {
-    if (await setDone(subtask, project, done)) {
-      onNotice(`Archived "${project.title}".`)
-      onClose()
-    }
+    const { archived, notice } = await setDone(subtask, project, done)
+    if (notice) onNotice(notice)
+    if (archived) onClose()
   }
 
   async function archive() {

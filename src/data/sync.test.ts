@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
   addIdea,
+  addSubtask,
   createProject,
   deleteIdea,
   deleteProject,
@@ -8,6 +9,7 @@ import {
   getProject,
   getSubtasks,
   makeProjectFromIdea,
+  setCleanup,
   updateIdea,
   updateProject,
 } from '.'
@@ -158,6 +160,32 @@ describe('pulling', () => {
     expect(publish.start).toBe('2026-11-21')
     await engine.syncNow()
     expect(server.subtasks.get(publish.id)?.start_date).toBe('2026-11-21')
+  })
+})
+
+describe('clean-up tasks', () => {
+  it('go up with their kind, come back the same, and switch kinds across devices', async () => {
+    const id = await newProject()
+    const added = await addSubtask(id, { title: 'Back up raw footage', start: '2026-11-16', kind: 'cleanup' })
+    if (!added.ok) throw new Error('not added')
+    await engine.syncNow()
+    expect(server.subtasks.get(added.id)).toMatchObject({ kind: 'cleanup', start_date: '2026-11-16' })
+
+    // Another device turns it back into a regular task, ending on Publish,
+    // just after this device's edit.
+    const sent = server.subtasks.get(added.id)!
+    const later = new Date(Date.parse(sent.edited_at) + 1).toISOString()
+    server.editFromAnotherDevice({
+      subtasks: [{ ...sent, kind: 'task', start_date: '2026-11-14', edited_at: later }],
+    })
+    await engine.syncNow()
+    expect((await getSubtasks(id)).find((s) => s.id === added.id)).toMatchObject({ kind: 'task', start: '2026-11-14' })
+
+    // Then this device makes it clean-up again, later.
+    await new Promise((resolve) => setTimeout(resolve, 5))
+    await setCleanup(added.id, true)
+    await engine.syncNow()
+    expect(server.subtasks.get(added.id)?.kind).toBe('cleanup')
   })
 })
 
