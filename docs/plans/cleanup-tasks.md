@@ -1,6 +1,6 @@
 # Plan: Clean-up tasks
 
-Status: built; waiting for the migration on dev and production · 2026-10-28. You chose the recommended option for questions A–D and kept the defaults under E–K. The checks so far are T-18 to T-21 in `docs/testing/manual-tests.md`.
+Status: built and in review · 2026-10-28. The migration has run on dev and production. You chose the recommended option for questions A–D and kept the defaults under E–K. The checks are T-18 to T-24 in `docs/testing/manual-tests.md`.
 
 ## Goal
 

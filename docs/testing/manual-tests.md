@@ -21,6 +21,35 @@ The scripts were throwaway and not committed; their steps are written out below.
 
 ## Branch `cleanup-tasks`: clean-up tasks (2026-10-28)
 
+### T-24 · Production after the clean-up migration, from outside · ✅ (what can be seen)
+- **Where:** the production project's public API, with the publishable key only and signed out, after you ran the migration there.
+- **How:** the same script as T-17.
+- **Result:**
+  - Everything is as in T-17: `ideas` and `projects` refuse signed-out reads (`42501`), `sync_push` still accepts both the three-list and the live app's two-list call, the made-up-argument control gets `PGRST202`, and sign-ups are off.
+  - **Not visible from outside:** whether the kind check now allows `'cleanup'`. Signed-out writes are refused before that check runs, and production has no test user. Your first clean-up task on the live site confirms it. Had the migration not taken, the account button would show a sync error.
+
+### T-23 · Clean-up tasks syncing between two browsers on the dev project · ✅
+- **Where:** the dev server with `.env.local` pointing at the dev project, after you ran the migration there. Two separate headless Chromium profiles (A, B), both signed in as the test user.
+- **How and result:**
+
+  | Step | Result |
+  | --- | --- |
+  | A creates a project with the default clean-up tasks | B shows it after **2.8 s**, with both clean-up tasks in its Clean-up section |
+  | A ticks "Clean-up task" on Thumbnail | B's open project shows Thumbnail under Clean-up after **2.3 s** |
+  | B ticks Publish | B is told "Published · 3 clean-up tasks left"; A shows the project under Wrapping up, "Clean-up · 0 of 3 done", after **2.3 s** |
+  | A ticks the three clean-up tasks | After the last one, A is offered to archive; after Archive, B drops it from its active cards after **1.8 s** and lists it in the Archive |
+  | A deletes the project | B drops it after **2.3 s** |
+
+- No console errors. Afterwards the test account had no live projects, subtasks or ideas.
+
+### T-22 · The clean-up migration on the dev project, through the API · ✅
+- **Where:** the dev project, as the test user, with the publishable key only.
+- **How:** a Node script pushes a project with its Publish and a clean-up task on Nov 20 (after publish), then a subtask with an unknown kind, then tombstones for everything it stored.
+- **Result:**
+  - The clean-up task is accepted and stored as `cleanup` on Nov 20.
+  - The unknown kind ("chore") is refused: `23514`, `subtasks_kind_check`. So the migration replaced the check under its expected name, rather than adding a second one.
+  - Everything ends as tombstones, with 0 live rows in the test account.
+
 ### T-21 · Clean-up in the phone's Projects tab and project sheet · ✅
 - **Where:** the dev server, signed out, in WebKit emulating an iPhone 15, with the sample data.
 - **How:** open the Projects tab, then the wrapping-up project's sheet, then one of its clean-up tasks.
