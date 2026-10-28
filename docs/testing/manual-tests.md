@@ -19,6 +19,94 @@ The scripts were throwaway and not committed; their steps are written out below.
 
 ---
 
+## Branch `cleanup-tasks`: clean-up tasks (2026-10-28)
+
+### T-24 · Production after the clean-up migration, from outside · ✅ (what can be seen)
+- **Where:** the production project's public API, with the publishable key only and signed out, after you ran the migration there.
+- **How:** the same script as T-17.
+- **Result:**
+  - Everything is as in T-17: `ideas` and `projects` refuse signed-out reads (`42501`), `sync_push` still accepts both the three-list and the live app's two-list call, the made-up-argument control gets `PGRST202`, and sign-ups are off.
+  - **Not visible from outside:** whether the kind check now allows `'cleanup'`. Signed-out writes are refused before that check runs, and production has no test user. Your first clean-up task on the live site confirms it. Had the migration not taken, the account button would show a sync error.
+
+### T-23 · Clean-up tasks syncing between two browsers on the dev project · ✅
+- **Where:** the dev server with `.env.local` pointing at the dev project, after you ran the migration there. Two separate headless Chromium profiles (A, B), both signed in as the test user.
+- **How and result:**
+
+  | Step | Result |
+  | --- | --- |
+  | A creates a project with the default clean-up tasks | B shows it after **2.8 s**, with both clean-up tasks in its Clean-up section |
+  | A ticks "Clean-up task" on Thumbnail | B's open project shows Thumbnail under Clean-up after **2.3 s** |
+  | B ticks Publish | B is told "Published · 3 clean-up tasks left"; A shows the project under Wrapping up, "Clean-up · 0 of 3 done", after **2.3 s** |
+  | A ticks the three clean-up tasks | After the last one, A is offered to archive; after Archive, B drops it from its active cards after **1.8 s** and lists it in the Archive |
+  | A deletes the project | B drops it after **2.3 s** |
+
+- No console errors. Afterwards the test account had no live projects, subtasks or ideas.
+
+### T-22 · The clean-up migration on the dev project, through the API · ✅
+- **Where:** the dev project, as the test user, with the publishable key only.
+- **How:** a Node script pushes a project with its Publish and a clean-up task on Nov 20 (after publish), then a subtask with an unknown kind, then tombstones for everything it stored.
+- **Result:**
+  - The clean-up task is accepted and stored as `cleanup` on Nov 20.
+  - The unknown kind ("chore") is refused: `23514`, `subtasks_kind_check`. So the migration replaced the check under its expected name, rather than adding a second one.
+  - Everything ends as tombstones, with 0 live rows in the test account.
+
+### T-21 · Clean-up in the phone's Projects tab and project sheet · ✅
+- **Where:** the dev server, signed out, in WebKit emulating an iPhone 15, with the sample data.
+- **How:** open the Projects tab, then the wrapping-up project's sheet, then one of its clean-up tasks.
+- **Result:**
+  - The Projects tab has a Wrapping up group with "Clean-up · 1 of 3 done".
+  - The sheet has the Clean-up section, with its three rows and "+ Add clean-up task".
+  - The subtask card's "Clean-up task" box is ticked.
+  - No console errors.
+
+### T-20 · Clean-up in the panels and sidebar on desktop · ✅
+- **Where:** the dev server, signed out, in headless Chromium at 1440×900, with the sample data.
+- **How and result:**
+
+  | Step | Result |
+  | --- | --- |
+  | Sidebar | "Packing tips Reel" sits under Wrapping up, reading "published Oct 25" and "Clean-up · 1 of 3 done", with the red dot (overdue clean-up) |
+  | Open it | Progress reads "3 of 3 done · 100%", leaving clean-up out. Below the subtasks, "Clean-up · 1 of 3 done" with three rows |
+  | Archive project | Asks "2 clean-up tasks aren't done. Archive anyway?"; Cancel keeps it |
+  | Tick one of the two open clean-up tasks | No offer |
+  | Tick the last one | Offers: '"Packing tips Reel" is published and its clean-up is done. Archive the project?'; declined, the card reads "Ready to archive" |
+  | Untick Publish | The project goes back to Active projects |
+  | + New project | "Start with default clean-up tasks" starts ticked. The new project shows "0 of 6 done", with "Back up raw footage" and "Share on Instagram Stories" on Nov 21, the day after publish |
+  | Tick its Publish | Notice "Published · 2 clean-up tasks left", no archive offer; every regular subtask ticked, the clean-up tasks not; the project moves to Wrapping up |
+  | + Add clean-up task | Starts on the day after publish; one added on Nov 24 asks nothing and joins the Clean-up section |
+  | Subtask card: tick "Clean-up task" on Edit, then untick it | It moves to the Clean-up section and back, with no prompt (it ends before publish) |
+  | Untick "Clean-up task" on the Nov 24 one | Offers to push the publish date to Nov 24; Cancel leaves it a clean-up task |
+  | Ideas → Make project | The dialog has the clean-up box, ticked |
+
+- No console errors.
+- **Found and fixed:** on a wrapping-up card in the desktop sidebar, "Instagram · published Oct 25" was too wide and wrapped after "Oct". The card now shows "published Oct 25" next to the platform icon, and screen readers still hear "Instagram".
+- **The script's first run stopped** at the first checkbox. Playwright's `check()` looks at a checkbox straight after the click, but the app's boxes change only once the save lands, a moment later. The script now clicks and waits.
+
+### T-19 · Clean-up tasks on the phone calendar · ✅
+- **Where:** the dev server, signed out, in WebKit emulating an iPhone 15, with the sample data. Today was 2026-10-28.
+- **How:** in the month view, tap Oct 27; then switch to the week view.
+- **Result:**
+  - The month lanes and the week view's day lines carry the wrapping-up project's band on past its Publish (Oct 25), in a lighter tint, to its last clean-up task.
+  - Oct 27's list shows "Back up raw footage" with the broom, a red outline and "Overdue · Clean-up · Packing tips Reel". Its label reads "…Back up raw footage, clean-up, Oct 27, overdue".
+  - No console errors.
+
+### T-18 · Clean-up tasks on the desktop calendar · ✅
+- **Where:** the dev server, signed out, in headless Chromium at 1440×900, with the sample data.
+- **How and result:**
+
+  | Step | Result |
+  | --- | --- |
+  | October, month view | The wrapping-up project's band runs on past Publish (Oct 25) in a lighter tint to its last clean-up task (Oct 30). Clean-up chips show a broom. The overdue one (Oct 27) has the red outline |
+  | November: drag the in-progress project's clean-up task from Nov 7 to Nov 9, after its Publish (Nov 6) | No prompt to push the publish date. The chip lands on Nov 9 and the lighter part stretches to it |
+  | Week view, Oct 25–31 | Clean-up chips show the broom, and their second line reads "Clean-up · Packing tips Reel" |
+
+- No console errors.
+- **The script's first two runs failed** before reaching the drag, both its own mistakes:
+  - it looked for the Nov 7 chip while October was showing;
+  - it then dropped on Monday of the wrong week row, landing on Nov 2. The app handled that correctly: a clean-up task before Publish is allowed (decision K), and the lighter part disappeared since nothing was left after Publish.
+
+---
+
 ## Branch `ideas`: the Ideas area (2026-10-28)
 
 ### T-17 · The ideas migration on production, from outside · ✅

@@ -3,7 +3,7 @@ import { createProject, makeProjectFromIdea } from '../../data'
 import { isISODate } from '../../lib/dates'
 import { formatIdeaMonth } from '../../lib/ideas'
 import { PLATFORM_LABELS, PLATFORMS } from '../../lib/platforms'
-import { DEFAULT_TASK_TITLES, PUBLISH_TITLE } from '../../lib/template'
+import { DEFAULT_CLEANUP_TITLES, DEFAULT_TASK_TITLES, PUBLISH_TITLE } from '../../lib/template'
 import type { Idea, Platform } from '../../types'
 import { cx } from '../cx'
 import { CloseButton } from './Modal'
@@ -23,6 +23,7 @@ export function NewProjectDialog({
   const [platform, setPlatform] = useState<Platform>(idea?.platform ?? 'youtube')
   const [publishDate, setPublishDate] = useState('')
   const [withDefaults, setWithDefaults] = useState(true)
+  const [withCleanup, setWithCleanup] = useState(true)
   const [saving, setSaving] = useState(false)
   const id = useId()
   const valid = title.trim() !== '' && isISODate(publishDate)
@@ -31,7 +32,13 @@ export function NewProjectDialog({
     event.preventDefault()
     if (!valid || saving) return
     setSaving(true)
-    const input = { title, platform, publishDate, withDefaultSubtasks: withDefaults }
+    const input = {
+      title,
+      platform,
+      publishDate,
+      withDefaultSubtasks: withDefaults,
+      withDefaultCleanup: withCleanup,
+    }
     const projectId = idea ? await makeProjectFromIdea(idea.id, input) : await createProject(input)
     onCreated(projectId)
   }
@@ -111,6 +118,21 @@ export function NewProjectDialog({
           Start with default subtasks
           <span className="block text-xs text-stone-500">
             {[...DEFAULT_TASK_TITLES, PUBLISH_TITLE].join(', ')}
+          </span>
+        </span>
+      </label>
+
+      <label className="-mt-1 flex items-start gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={withCleanup}
+          onChange={(event) => setWithCleanup(event.target.checked)}
+          className="mt-0.5 size-4"
+        />
+        <span>
+          Start with default clean-up tasks
+          <span className="block text-xs text-stone-500">
+            {DEFAULT_CLEANUP_TITLES.join(', ')}, the day after publish
           </span>
         </span>
       </label>

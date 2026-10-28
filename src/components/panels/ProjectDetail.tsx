@@ -12,8 +12,10 @@ import { COLOR_HEX, COLOR_IDS, isColorAvailable, projectHex } from '../../lib/co
 import { addDaysISO, formatDateRange, formatLongDate, isISODate } from '../../lib/dates'
 import { isOverdue } from '../../lib/overdue'
 import { PLATFORM_LABELS } from '../../lib/platforms'
+import { cleanupProgress } from '../../lib/cleanup'
+import { plural } from '../../lib/plural'
 import { getProgress } from '../../lib/progress'
-import { includesDay, isPublish, sortSubtasks } from '../../lib/subtasks'
+import { includesDay, isCleanup, isPublish, sortSubtasks } from '../../lib/subtasks'
 import type { ISODate, Project, Subtask } from '../../types'
 import { addTask, movePublishDate, setDone } from '../actions'
 import { ask } from '../ask'
@@ -51,9 +53,11 @@ export function ProjectDetail({
   const notes = useAutosave(project.notes, (next) => void updateProject(project.id, { notes: next }))
   const [publishError, setPublishError] = useState('')
   const [shifting, setShifting] = useState(false)
-  const [adding, setAdding] = useState(false)
+  const [adding, setAdding] = useState<'task' | 'cleanup' | null>(null)
   const id = useId()
   const progress = getProgress(subtasks)
+  const sorted = sortSubtasks(subtasks)
+  const cleanup = cleanupProgress(subtasks)
   const hex = projectHex(project)
   const otherPlatform = project.platform === 'youtube' ? 'instagram' : 'youtube'
 
@@ -65,13 +69,20 @@ export function ProjectDetail({
   }
 
   async function toggle(subtask: Subtask, done: boolean) {
-    if (await setDone(subtask, project, done)) {
-      onNotice(`Archived "${project.title}".`)
-      onClose()
-    }
+    const { archived, notice } = await setDone(subtask, project, done)
+    if (notice) onNotice(notice)
+    if (archived) onClose()
   }
 
   async function archive() {
+    const open = cleanup.total - cleanup.done
+    if (open > 0) {
+      const sure = await ask(
+        `${plural(open, 'clean-up task')} ${open === 1 ? "isn't" : "aren't"} done. Archive anyway?`,
+        { confirmLabel: 'Archive' },
+      )
+      if (!sure) return
+    }
     await archiveProject(project.id)
     onNotice(`Archived "${project.title}".`)
     onClose()
@@ -164,7 +175,37 @@ export function ProjectDetail({
             Subtasks
           </h3>
           <ul className="flex flex-col gap-1.5">
-            {sortSubtasks(subtasks).map((subtask) => (
+            {sorted
+              .filter((s) => !isCleanup(s))
+              .map((subtask) => (
+                <SubtaskRow
+                  key={subtask.id}
+                  subtask={subtask}
+                  project={project}
+                  today={today}
+                  onToggle={(done) => void toggle(subtask, done)}
+                  onOpen={() => onOpenSubtask(subtask.id)}
+                />
+              ))}
+          </ul>
+          {adding === 'task' ? (
+            <AddSubtaskForm kind="task" project={project} today={today} onDone={() => setAdding(null)} />
+          ) : (
+            <AddButton onClick={() => setAdding('task')}>+ Add subtask</AddButton>
+          )}
+
+          <h3 id={`${id}-cleanup`} className="mt-5 mb-0.5 text-sm font-semibold">
+            Clean-up
+            {cleanup.total > 0 && (
+              <span className="font-normal text-stone-500">
+                {' '}
+                · {cleanup.done} of {cleanup.total} done
+              </span>
+            )}
+          </h3>
+          <p className="mb-2 text-xs text-stone-500">After the video is out. Doesn't count toward progress.</p>
+          <ul aria-labelledby={`${id}-cleanup`} className="flex flex-col gap-1.5">
+            {sorted.filter(isCleanup).map((subtask) => (
               <SubtaskRow
                 key={subtask.id}
                 subtask={subtask}
@@ -175,16 +216,10 @@ export function ProjectDetail({
               />
             ))}
           </ul>
-          {adding ? (
-            <AddSubtaskForm project={project} today={today} onDone={() => setAdding(false)} />
+          {adding === 'cleanup' ? (
+            <AddSubtaskForm kind="cleanup" project={project} today={today} onDone={() => setAdding(null)} />
           ) : (
-            <button
-              type="button"
-              onClick={() => setAdding(true)}
-              className="mt-1.5 w-full rounded-md border border-dashed border-stone-300 py-2 text-sm text-stone-500 hover:bg-stone-50"
-            >
-              + Add subtask
-            </button>
+            <AddButton onClick={() => setAdding('cleanup')}>+ Add clean-up task</AddButton>
           )}
         </section>
 
@@ -301,24 +336,46 @@ function SubtaskRow({
   )
 }
 
+function AddButton({ onClick, children }: { onClick: () => void; children: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="mt-1.5 w-full rounded-md border border-dashed border-stone-300 py-2 text-sm text-stone-500 hover:bg-stone-50"
+    >
+      {children}
+    </button>
+  )
+}
+
 function AddSubtaskForm({
+  kind,
   project,
   today,
   onDone,
 }: {
+  kind: 'task' | 'cleanup'
   project: Project
   today: ISODate
   onDone: () => void
 }) {
   const [title, setTitle] = useState('')
-  // Today, unless that's past the publish date.
-  const [start, setStart] = useState(() => (today <= project.publishDate ? today : project.publishDate))
+  // A task starts today, unless that's past the publish date; a clean-up
+  // task, the day after publish.
+  const [start, setStart] = useState(() =>
+    kind === 'cleanup'
+      ? addDaysISO(project.publishDate, 1)
+      : today <= project.publishDate
+        ? today
+        : project.publishDate,
+  )
   const valid = title.trim() !== '' && isISODate(start)
+  const noun = kind === 'cleanup' ? 'clean-up task' : 'subtask'
 
   async function submit(event: FormEvent) {
     event.preventDefault()
     if (!valid) return
-    if (await addTask(project.id, { title, start })) setTitle('')
+    if (await addTask(project.id, { title, start, kind })) setTitle('')
   }
 
   return (
@@ -335,15 +392,15 @@ function AddSubtaskForm({
     >
       <input
         autoFocus
-        aria-label="New subtask title"
-        placeholder="Subtask name"
+        aria-label={`New ${noun} title`}
+        placeholder={kind === 'cleanup' ? 'Clean-up task name' : 'Subtask name'}
         value={title}
         onChange={(event) => setTitle(event.target.value)}
         className="min-w-0 flex-1 rounded px-2 py-1 text-sm focus:outline-none"
       />
       <input
         type="date"
-        aria-label="New subtask date"
+        aria-label={`New ${noun} date`}
         value={start}
         onChange={(event) => setStart(event.target.value)}
         className="rounded border border-stone-300 px-1.5 py-1 text-sm tabular-nums"
@@ -353,7 +410,7 @@ function AddSubtaskForm({
       </button>
       <button
         type="button"
-        aria-label="Cancel adding a subtask"
+        aria-label={`Cancel adding a ${noun}`}
         onClick={onDone}
         className="px-1 text-stone-500 hover:text-stone-800 max-md:px-3 max-md:py-2"
       >

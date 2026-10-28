@@ -95,6 +95,24 @@ select test.expect(
   'the row is stamped with her user id'
 );
 
+select public.sync_push(null, jsonb_build_array(jsonb_build_object(
+  'id', 'f0000000-0000-4000-8000-0000000000dd', 'project_id', 'f0000000-0000-4000-8000-0000000000aa',
+  'kind', 'cleanup', 'title', 'Back up raw footage', 'start_date', '2026-11-15', 'end_date', null,
+  'done', false, 'notes', '', 'sort_order', 6, 'deleted', false, 'edited_at', '2026-10-27T10:00:00Z'
+)));
+select test.expect(
+  (select kind = 'cleanup' from public.subtasks where id = 'f0000000-0000-4000-8000-0000000000dd'),
+  'a clean-up task is accepted'
+);
+select test.expect_error(
+  $$select public.sync_push(null, jsonb_build_array(jsonb_build_object(
+    'id', gen_random_uuid(), 'project_id', 'f0000000-0000-4000-8000-0000000000aa',
+    'kind', 'chore', 'title', 'Unknown', 'start_date', '2026-11-15', 'end_date', null,
+    'done', false, 'notes', '', 'sort_order', 7, 'deleted', false, 'edited_at', '2026-10-27T10:00:00Z'
+  )))$$,
+  'an unknown kind of subtask is refused'
+);
+
 select public.sync_push(test.project('Old title', '2026-10-27T09:00:00Z'), null);
 select test.expect(
   (select title = 'Vlog' from public.projects),

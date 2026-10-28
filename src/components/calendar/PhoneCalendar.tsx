@@ -18,8 +18,9 @@ import {
   type WeekPlacement,
 } from '../../lib/lanes'
 import { isOverdue } from '../../lib/overdue'
-import { isPublish } from '../../lib/subtasks'
+import { isCleanup, isPublish } from '../../lib/subtasks'
 import type { ISODate, Project, Subtask } from '../../types'
+import { CleanupIcon } from '../CleanupIcon'
 import { cx } from '../cx'
 import { stopDragStart, type ChipDragData } from './useChipDrag'
 import type { CalendarActions } from './WeekRow'
@@ -227,21 +228,30 @@ function MonthWeekRow({
   )
 }
 
-// A lane of the month grid: the project's tinted band, with a solid stretch
-// on each task's days.
+// A lane of the month grid: the project's tinted band (lighter after the
+// publish date), with a solid stretch on each task's days.
 function MiniLane({ lane, today }: { lane: Lane; today: ISODate }) {
   return (
     <div className="grid h-1.5 grid-cols-7">
       {lane.segments.map((segment) => (
         <Fragment key={segment.project.id}>
-          <span
-            className={edges(segment, 'band')}
-            style={{
-              gridColumn: columns(segment),
-              gridRow: 1,
-              background: tint(projectHex(segment.project), 30, 'transparent'),
-            }}
-          />
+          {([
+            [segment.main, BAND_TINT],
+            [segment.tail, TAIL_TINT],
+          ] as const).map(
+            ([part, strength]) =>
+              part && (
+                <span
+                  key={strength}
+                  className={edges(part, 'band')}
+                  style={{
+                    gridColumn: columns(part),
+                    gridRow: 1,
+                    background: tint(projectHex(segment.project), strength, 'transparent'),
+                  }}
+                />
+              ),
+          )}
           {segment.chips.map((chip) => (
             <span
               key={chip.subtask.id}
@@ -273,6 +283,7 @@ function DayLine({ lane, col, today }: { lane: Lane; col: number; today: ISODate
   const bandEnds = segment.endCol === col && !segment.continuesAfter
   const taskStarts = chips.some((c) => c.startCol === col && !c.continuesBefore)
   const taskEnds = chips.some((c) => c.endCol === col && !c.continuesAfter)
+  const inTail = segment.tail !== null && segment.tail.startCol <= col && col <= segment.tail.endCol
 
   return (
     <span className="relative w-1.5">
@@ -282,7 +293,7 @@ function DayLine({ lane, col, today }: { lane: Lane; col: number; today: ISODate
           bandStarts ? 'top-2 rounded-t-full' : 'top-0',
           bandEnds ? 'bottom-2 rounded-b-full' : 'bottom-0',
         )}
-        style={{ background: tint(projectHex(segment.project), 30, 'transparent') }}
+        style={{ background: tint(projectHex(segment.project), inTail ? TAIL_TINT : BAND_TINT, 'transparent') }}
       />
       {shown && (
         <span
@@ -298,6 +309,10 @@ function DayLine({ lane, col, today }: { lane: Lane; col: number; today: ISODate
     </span>
   )
 }
+
+// The band's tint, and its lighter part after the publish date.
+const BAND_TINT = 30
+const TAIL_TINT = 15
 
 function taskColor(subtask: Subtask, project: Project, today: ISODate): string {
   return !project.archived && isOverdue(subtask, today) ? OVERDUE_HEX : projectHex(project)
@@ -396,7 +411,7 @@ function PhoneChip({
       />
       <button
         type="button"
-        aria-label={`${project.title}: ${subtask.title}, ${formatDateRange(subtask.start, subtask.end)}${
+        aria-label={`${project.title}: ${subtask.title}${isCleanup(subtask) ? ', clean-up' : ''}, ${formatDateRange(subtask.start, subtask.end)}${
           subtask.done ? ', done' : overdue ? ', overdue' : ''
         }`}
         onClick={() => actions.onOpenSubtask(subtask.id)}
@@ -433,10 +448,12 @@ function ChipText({ task: { subtask, project }, overdue }: { task: DayTask; over
           subtask.done && 'text-stone-400 line-through',
         )}
       >
+        {isCleanup(subtask) && <CleanupIcon className="mr-1 inline size-3.5 align-[-2px]" />}
         {subtask.title}
       </span>
       <span className="block truncate text-xs text-stone-500">
         {overdue && <span className="font-medium text-red-700">Overdue · </span>}
+        {isCleanup(subtask) && 'Clean-up · '}
         {project.title}
         {subtask.end && ` · ${formatDateRange(subtask.start, subtask.end)}`}
       </span>

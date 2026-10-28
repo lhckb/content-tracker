@@ -23,10 +23,16 @@ export interface ChipPlacement extends WeekPlacement {
   row: number
 }
 
+// The whole band's place in the week, which lanes keep clear. It's drawn
+// in up to two parts: `main` up to the publish date, and `tail`, lighter,
+// on to the last clean-up task. Where they meet they're drawn as carrying
+// on into each other.
 export interface BandSegment extends WeekPlacement {
   project: Project
   chips: ChipPlacement[]
   rowCount: number
+  main: WeekPlacement | null
+  tail: WeekPlacement | null
 }
 
 // One horizontal track of a week row. Its segments never share a day.
@@ -74,11 +80,16 @@ export function layoutWeek(
     const placement = placeInWeek(weekStart, span.start, span.end)
     if (!placement) continue
     const chips = layoutChips(weekStart, subtasks)
+    const hasTail = span.end > span.publishDate
+    const main = placeInWeek(weekStart, span.start, span.publishDate)
+    const tail = hasTail ? placeInWeek(weekStart, addDaysISO(span.publishDate, 1), span.end) : null
     const segment: BandSegment = {
       ...placement,
       project,
       chips,
       rowCount: Math.max(1, ...chips.map((c) => c.row + 1)),
+      main: main && { ...main, continuesAfter: main.continuesAfter || hasTail },
+      tail: tail && { ...tail, continuesBefore: true },
     }
     let lane = lanes.find((l) => l.segments.every((s) => !overlaps(s, segment)))
     if (!lane) {

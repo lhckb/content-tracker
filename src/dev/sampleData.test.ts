@@ -6,7 +6,7 @@ import { getProgress } from '../lib/progress'
 import { loadSampleData } from './sampleData'
 
 describe('loadSampleData', () => {
-  it('matches the mockup: three active projects, one archived, one overdue', async () => {
+  it('matches the mockup, plus one project wrapping up with clean-up left', async () => {
     const today = '2026-11-05'
     await loadSampleData(today)
     const { projects, subtasks } = await getTrackerData()
@@ -24,6 +24,7 @@ describe('loadSampleData', () => {
     })
     expect(summary).toEqual([
       { title: 'Coffee grinder review', color: 'pink', archived: true, percent: 100, overdue: false },
+      { title: 'Packing tips Reel', color: 'pink', archived: false, percent: 100, overdue: true },
       { title: 'Gym Reel: leg day', color: 'green', archived: false, percent: 25, overdue: true },
       { title: 'Morning routine vlog', color: 'blue', archived: false, percent: 50, overdue: false },
       { title: 'Desk setup tour', color: 'orange', archived: false, percent: 0, overdue: false },

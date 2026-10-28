@@ -37,6 +37,16 @@ describe('sortSubtasks', () => {
     ])
     expect(sorted.map((s) => s.title)).toEqual(['A', 'B', 'Edit', 'Late', 'Publish'])
   })
+
+  it('puts clean-up tasks after Publish, by date', () => {
+    const sorted = sortSubtasks([
+      subtask({ title: 'Stories', kind: 'cleanup', start: '2026-11-16' }),
+      subtask({ title: 'Backup', kind: 'cleanup', start: '2026-11-02' }),
+      subtask({ title: 'Publish', kind: 'publish', start: '2026-11-14' }),
+      subtask({ title: 'Edit', start: '2026-11-10' }),
+    ])
+    expect(sorted.map((s) => s.title)).toEqual(['Edit', 'Publish', 'Backup', 'Stories'])
+  })
 })
 
 describe('guard rail', () => {
@@ -56,5 +66,10 @@ describe('guard rail', () => {
       'Thumbnail',
     ])
     expect(tasksEndingAfter(subtasks, '2026-11-13')).toEqual([])
+  })
+
+  it('never counts clean-up tasks', () => {
+    const subtasks = [subtask({ title: 'Stories', kind: 'cleanup', start: '2026-11-20' })]
+    expect(tasksEndingAfter(subtasks, '2026-11-14')).toEqual([])
   })
 })

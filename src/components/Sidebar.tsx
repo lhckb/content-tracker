@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { restoreProject, useAccount, type TrackerData } from '../data'
+import { cleanupProgress, isWrappingUp } from '../lib/cleanup'
 import { projectHex } from '../lib/colors'
 import { formatShortDate } from '../lib/dates'
 import { hasOverdue } from '../lib/overdue'
@@ -7,6 +8,7 @@ import { PLATFORM_LABELS } from '../lib/platforms'
 import { getProgress } from '../lib/progress'
 import { groupByProject } from '../lib/subtasks'
 import type { ISODate, Project, Subtask } from '../types'
+import { CleanupIcon } from './CleanupIcon'
 import { cx } from './cx'
 import { PlatformIcon } from './PlatformIcon'
 import { ProgressBar } from './ProgressBar'
@@ -26,7 +28,14 @@ export function Sidebar({
   const signedOut = useAccount().state === 'signed-out'
   const subtasksByProject = groupByProject(data?.subtasks ?? [])
   const projects = data?.projects ?? []
-  const active = projects.filter((p) => !p.archived).sort(byPublishDate)
+  const subtasksOf = (project: Project) => subtasksByProject.get(project.id) ?? []
+  // Published but not archived yet: still active, listed apart.
+  const wrapping = projects
+    .filter((p) => isWrappingUp(p, subtasksOf(p)))
+    .sort(byPublishDate)
+  const active = projects
+    .filter((p) => !p.archived && !isWrappingUp(p, subtasksOf(p)))
+    .sort(byPublishDate)
   const archived = projects
     .filter((p) => p.archived)
     .sort(byPublishDate)
@@ -54,13 +63,31 @@ export function Sidebar({
           <li key={project.id}>
             <ProjectCard
               project={project}
-              subtasks={subtasksByProject.get(project.id) ?? []}
+              subtasks={subtasksOf(project)}
               today={today}
               onOpen={() => onOpenProject(project.id)}
             />
           </li>
         ))}
       </ul>
+
+      {wrapping.length > 0 && (
+        <>
+          <h2 className="mt-2 text-sm font-medium text-stone-500">Wrapping up</h2>
+          <ul className="flex flex-col gap-2">
+            {wrapping.map((project) => (
+              <li key={project.id}>
+                <ProjectCard
+                  project={project}
+                  subtasks={subtasksOf(project)}
+                  today={today}
+                  onOpen={() => onOpenProject(project.id)}
+                />
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
 
       {archived.length > 0 && (
         <div className="mt-2 border-t border-stone-200 pt-3">
@@ -108,6 +135,8 @@ export function Sidebar({
   )
 }
 
+// An active project with its progress, or one wrapping up with its
+// clean-up left.
 function ProjectCard({
   project,
   subtasks,
@@ -120,6 +149,8 @@ function ProjectCard({
   onOpen: () => void
 }) {
   const progress = getProgress(subtasks)
+  const wrappingUp = isWrappingUp(project, subtasks)
+  const cleanup = cleanupProgress(subtasks)
   const color = projectHex(project)
   return (
     <button
@@ -141,12 +172,30 @@ function ProjectCard({
       </span>
       <span className="mt-0.5 flex items-center gap-1 text-xs text-stone-500">
         <PlatformIcon platform={project.platform} className="size-3.5 shrink-0" />
-        {PLATFORM_LABELS[project.platform]} · publish {formatShortDate(project.publishDate)}
+        {/* "Instagram · published Oct 25" is too wide for the sidebar, so a
+            wrapping-up card leaves the platform to its icon. */}
+        {wrappingUp ? (
+          <>
+            <span className="sr-only">{PLATFORM_LABELS[project.platform]} · </span>
+            published {formatShortDate(project.publishDate)}
+          </>
+        ) : (
+          `${PLATFORM_LABELS[project.platform]} · publish ${formatShortDate(project.publishDate)}`
+        )}
       </span>
-      <span className="mt-2 flex items-center gap-2">
-        <ProgressBar percent={progress.percent} color={color} />
-        <span className="w-9 text-right text-xs font-medium tabular-nums">{progress.percent}%</span>
-      </span>
+      {wrappingUp ? (
+        <span className="mt-1.5 flex items-center gap-1 text-xs font-medium text-stone-700">
+          <CleanupIcon className="size-3.5 shrink-0" />
+          {cleanup.done < cleanup.total
+            ? `Clean-up · ${cleanup.done} of ${cleanup.total} done`
+            : 'Ready to archive'}
+        </span>
+      ) : (
+        <span className="mt-2 flex items-center gap-2">
+          <ProgressBar percent={progress.percent} color={color} />
+          <span className="w-9 text-right text-xs font-medium tabular-nums">{progress.percent}%</span>
+        </span>
+      )}
     </button>
   )
 }

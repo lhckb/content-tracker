@@ -2,7 +2,7 @@ import { isColorAvailable, pickColor } from '../lib/colors'
 import { addDaysISO, assertISODate } from '../lib/dates'
 import { shiftRange } from '../lib/shift'
 import { sortSubtasks, tasksEndingAfter } from '../lib/subtasks'
-import { defaultTasks, PUBLISH_TITLE } from '../lib/template'
+import { defaultCleanupTasks, defaultTasks, PUBLISH_TITLE } from '../lib/template'
 import type { ColorId, ISODate, Platform, Project, Subtask } from '../types'
 import { db, requestPersistentStorage, writing } from './db'
 import { newId } from './ids'
@@ -19,6 +19,8 @@ export interface NewProject {
   platform: Platform
   publishDate: ISODate
   withDefaultSubtasks: boolean
+  // The default clean-up tasks, the day after the publish date.
+  withDefaultCleanup?: boolean
   notes?: string
 }
 
@@ -39,6 +41,7 @@ export async function createProject(input: NewProject): Promise<string> {
       archived: false,
     }
     const tasks = input.withDefaultSubtasks ? defaultTasks(input.publishDate) : []
+    const cleanup = input.withDefaultCleanup ? defaultCleanupTasks(input.publishDate) : []
     await db.projects.add(project)
     await db.subtasks.bulkAdd([
       ...tasks.map((task, order) => newSubtask(project.id, { ...task, order })),
@@ -48,6 +51,9 @@ export async function createProject(input: NewProject): Promise<string> {
         start: input.publishDate,
         order: tasks.length,
       }),
+      ...cleanup.map((task, i) =>
+        newSubtask(project.id, { ...task, kind: 'cleanup', order: tasks.length + 1 + i }),
+      ),
     ])
     return project.id
   })

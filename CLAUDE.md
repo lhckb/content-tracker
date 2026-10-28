@@ -38,10 +38,10 @@ The full spec is in @SPEC.md and is the source of truth. Read it before writing 
 
 ## Behaviors that are easy to get wrong
 
-- Publish is a special subtask locked to the project's publish date; it is always the last row and counts toward progress.
-- Progress = done subtasks ÷ total subtasks, all weighted equally.
+- Publish is a special subtask locked to the project's publish date; it is always the last row of the subtasks (clean-up tasks are listed after it, in their own section) and counts toward progress.
+- Progress = done subtasks ÷ total subtasks, all weighted equally, except clean-up tasks, which don't count.
 - Overdue = the subtask's last day is before today and it isn't done. It shows a red chip outline, and the project card gets a red dot. Overdue subtasks never move on their own.
-- A subtask can't end after the publish date. If one is dropped there, prompt to push the publish date instead.
+- A subtask can't end after the publish date, except clean-up tasks. If one is dropped there, prompt to push the publish date instead.
 - Overlapping projects stack in lanes within each week row. A band continues across week rows.
 - Weeks start on Sunday.
 - About 8 preset colors, auto-assigned; no two active projects share one.
@@ -79,6 +79,21 @@ The plan and its decisions are in `docs/plans/ideas.md`.
   - grouping by month in `src/lib/ideas.ts`.
 - **Make project** calls `makeProjectFromIdea`. It creates the project and deletes the idea in one `writing()` transaction, so sync never sees one without the other.
 - **Backups** are format version 2, which includes ideas. Version 1 files still import and leave ideas alone.
+
+## Clean-up tasks (added after the MVP)
+
+The plan and its decisions are in `docs/plans/cleanup-tasks.md`.
+
+- **A third kind of subtask, `'cleanup'`,** for the work after a video is out. Clean-up tasks are dated and sit on the calendar with a broom icon. They:
+  - don't count toward progress;
+  - aren't ticked when Publish is ticked;
+  - may fall after the publish date: the guard rail and `setPublishDate` ignore them;
+  - move with Shift project.
+- **The band** runs on past Publish, lighter, to the last clean-up task (`main` and `tail` in `BandSegment`).
+- **Wrapping up:**
+  - A project whose Publish is ticked but that isn't archived sits under Wrapping up in the sidebar (`isWrappingUp` in `src/lib/cleanup.ts`), and keeps its color.
+  - Ticking Publish offers to archive only when no clean-up task is open. Otherwise ticking the last clean-up task makes the offer (`setDone` in `src/components/actions.ts`).
+- **Backups** are format version 3. Versions 1 and 2 still import.
 
 ## Phone layout (added after the MVP)
 

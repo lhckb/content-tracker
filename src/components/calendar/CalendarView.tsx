@@ -87,8 +87,8 @@ export function CalendarView({
       if (!drag.wasJustDropped()) onOpenSubtask(id)
     },
     onToggleDone: (subtask: Subtask, project: Project, done: boolean) => {
-      void setDone(subtask, project, done).then((archived) => {
-        if (archived) onNotice(`Archived "${project.title}".`)
+      void setDone(subtask, project, done).then(({ notice }) => {
+        if (notice) onNotice(notice)
       })
     },
   }

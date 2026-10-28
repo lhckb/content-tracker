@@ -120,6 +120,17 @@ describe('change recording', () => {
     expect(after > before).toBe(true)
   })
 
+  it('stamps changes in quick succession with strictly later times', async () => {
+    switchSpace(ACCOUNT)
+    const id = await addIdea({ title: 'Studio tour', platform: 'youtube' })
+    const stamps: string[] = []
+    for (const description of ['a', 'b', 'c']) {
+      await updateIdea(id, { description })
+      stamps.push((await db.pending.get(`ideas:${id}`))?.editedAt ?? '')
+    }
+    expect(stamps[0] < stamps[1] && stamps[1] < stamps[2]).toBe(true)
+  })
+
   it('keeps a deleted record’s last values, for the tombstone', async () => {
     switchSpace(ACCOUNT)
     const id = await newProject()

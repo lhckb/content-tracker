@@ -130,3 +130,51 @@ describe('layoutWeek', () => {
     expect(week2).toMatchObject({ startCol: 0, endCol: 1, continuesBefore: true })
   })
 })
+
+describe('the band after Publish', () => {
+  // Publish on Thursday Nov 12; clean-up on Nov 13 and Nov 16–17.
+  function wrapping(): ProjectWithSubtasks {
+    const item = project('wrap', '2026-11-12', [['Edit', '2026-11-10']])
+    for (const [title, start, end] of [
+      ['Backup', '2026-11-13'],
+      ['Stories', '2026-11-16', '2026-11-17'],
+    ]) {
+      item.subtasks.push({
+        id: `wrap-${title}`,
+        projectId: 'wrap',
+        kind: 'cleanup',
+        title,
+        start,
+        ...(end ? { end } : {}),
+        done: false,
+        notes: '',
+        order: 9,
+      })
+    }
+    return item
+  }
+
+  it('carries on, lighter, to the last clean-up task', () => {
+    const [lane] = layoutWeek('2026-11-08', [wrapping()])
+    const segment = lane.segments[0]
+    expect([segment.startCol, segment.endCol, segment.continuesAfter]).toEqual([2, 6, true])
+    expect(segment.main).toMatchObject({ startCol: 2, endCol: 4, continuesBefore: false, continuesAfter: true })
+    expect(segment.tail).toMatchObject({ startCol: 5, endCol: 6, continuesBefore: true, continuesAfter: true })
+
+    const [next] = layoutWeek('2026-11-15', [wrapping()])
+    expect(next.segments[0].main).toBeNull()
+    expect(next.segments[0].tail).toMatchObject({ startCol: 0, endCol: 2, continuesBefore: true, continuesAfter: false })
+  })
+
+  it('keeps the lighter part clear of other projects', () => {
+    const other = project('other', '2026-11-20', [['Script', '2026-11-16']])
+    const lanes = layoutWeek('2026-11-15', [wrapping(), other])
+    expect(lanes).toHaveLength(2)
+  })
+
+  it('has no lighter part without clean-up tasks after Publish', () => {
+    const [lane] = layoutWeek('2026-11-08', [project('plain', '2026-11-12', [['Edit', '2026-11-10']])])
+    expect(lane.segments[0].tail).toBeNull()
+    expect(lane.segments[0].main).toMatchObject({ endCol: 4, continuesAfter: false })
+  })
+})
