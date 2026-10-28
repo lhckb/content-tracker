@@ -1,6 +1,6 @@
 # Plan: Clean-up tasks
 
-Status: approved, in progress · 2026-10-28. You chose the recommended option for questions A–D and kept the defaults under E–K.
+Status: built; waiting for the migration on dev and production · 2026-10-28. You chose the recommended option for questions A–D and kept the defaults under E–K. The checks so far are T-18 to T-21 in `docs/testing/manual-tests.md`.
 
 ## Goal
 
