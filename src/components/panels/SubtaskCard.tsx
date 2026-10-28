@@ -3,9 +3,9 @@ import { deleteSubtask, updateSubtask } from '../../data'
 import { useAutosave } from '../../hooks/useAutosave'
 import { projectHex } from '../../lib/colors'
 import { addDaysISO, daysBetween } from '../../lib/dates'
-import { isPublish } from '../../lib/subtasks'
+import { isCleanup, isPublish } from '../../lib/subtasks'
 import type { ISODate, Project, Subtask } from '../../types'
-import { movePublishDate, moveTask, setDone } from '../actions'
+import { movePublishDate, moveTask, setCleanupKind, setDone } from '../actions'
 import { ask } from '../ask'
 import { DateField } from './DateField'
 import { CloseButton } from './Modal'
@@ -145,6 +145,22 @@ export function SubtaskCard({
             />
             Mark as done
           </label>
+          {/* Turning one back into a task may need the publish date pushed
+              (setCleanupKind asks); declining leaves the box as it was. */}
+          {!publish && (
+            <label className="mt-1 flex items-start gap-2 px-3 py-1 text-sm">
+              <input
+                type="checkbox"
+                checked={isCleanup(subtask)}
+                onChange={(event) => void setCleanupKind(subtask, event.target.checked)}
+                className="mt-0.5 size-4"
+              />
+              <span>
+                Clean-up task
+                <span className="block text-xs text-stone-500">Doesn't count toward progress</span>
+              </span>
+            </label>
+          )}
         </fieldset>
       </div>
 

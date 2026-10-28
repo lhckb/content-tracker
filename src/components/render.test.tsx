@@ -88,7 +88,6 @@ describe('Sidebar', () => {
     expect(positions).toEqual([...positions].sort((a, b) => a - b))
     expect(html()).toContain('Instagram · publish Nov 10')
     expect(html().match(/aria-valuenow="(\d+)"/g)).toEqual([
-      'aria-valuenow="100"',
       'aria-valuenow="25"',
       'aria-valuenow="50"',
       'aria-valuenow="0"',
@@ -97,6 +96,14 @@ describe('Sidebar', () => {
 
   it('puts a red dot on projects with overdue subtasks only', () => {
     expect(html().match(/aria-label="Has overdue subtasks"/g)).toHaveLength(2)
+  })
+
+  it('lists a published project with clean-up left under Wrapping up', () => {
+    const wrapping = html().slice(html().indexOf('Wrapping up'))
+    expect(wrapping).toContain('Packing tips Reel')
+    expect(wrapping).toContain('Instagram · </span>published Nov 2')
+    expect(wrapping).toContain('Clean-up · 1 of 3 done')
+    expect(html().indexOf('Packing tips Reel')).toBeGreaterThan(html().indexOf('Wrapping up'))
   })
 
   it('keeps the archive collapsed with a count', () => {
