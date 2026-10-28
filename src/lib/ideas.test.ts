@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Idea } from '../types'
-import { formatIdeaMonth, groupIdeas, isISOMonth, yearOptions } from './ideas'
+import { formatIdeaMonth, groupIdeas, isISOMonth, MONTH_NAMES, nextOccurrence, yearOptions } from './ideas'
 import { projectsAndIdeas } from './plural'
 
 let next = 0
@@ -62,6 +62,13 @@ describe('months', () => {
 
   it('formats a month for headings', () => {
     expect(formatIdeaMonth('2027-03')).toBe('March 2027')
+  })
+
+  it('picks the next occurrence of a month chosen without a year', () => {
+    expect(nextOccurrence(11, TODAY)).toBe('2026-11')
+    expect(nextOccurrence(12, TODAY)).toBe('2026-12')
+    expect(nextOccurrence(3, TODAY)).toBe('2027-03')
+    expect(MONTH_NAMES[2]).toBe('March')
   })
 
   it('offers this year to three ahead, plus the idea’s own year', () => {

@@ -2,8 +2,9 @@ import { useCallback, useEffect, useState } from 'react'
 import { CalendarView } from './components/calendar/CalendarView'
 import { ConfirmHost } from './components/ConfirmHost'
 import { Panels, type Panel } from './components/panels/Panels'
+import { IdeasView } from './components/ideas/IdeasView'
 import { Sidebar } from './components/Sidebar'
-import { TabBar, type Tab } from './components/TabBar'
+import { TabBar } from './components/TabBar'
 import { Toast } from './components/Toast'
 import { cx } from './components/cx'
 import { ask } from './components/ask'
@@ -16,6 +17,7 @@ import {
   useIdeas,
   useTrackerData,
 } from './data'
+import { useStoredTab } from './hooks/useStoredTab'
 import { useToday } from './hooks/useToday'
 import { projectsAndIdeas } from './lib/plural'
 
@@ -24,8 +26,10 @@ function App() {
   const ideas = useIdeas()
   const today = useToday()
   const [panel, setPanel] = useState<Panel | null>(null)
-  // Which half shows at phone width; wider screens show both side by side.
-  const [tab, setTab] = useState<Tab>('calendar')
+  // At phone width, the tab bar's section. Wider screens show the calendar
+  // and project list side by side, so they only tell the calendar from the
+  // ideas.
+  const [tab, setTab] = useStoredTab()
   // A Google sign-in that came back refused says why.
   const [notice, setNotice] = useState(startupSignInError ?? '')
   const dismissNotice = useCallback(() => setNotice(''), [])
@@ -55,17 +59,28 @@ function App() {
   }, [signedInAs])
   const openProject = useCallback((id: string) => setPanel({ kind: 'project', id }), [])
   const openSubtask = useCallback((id: string) => setPanel({ kind: 'subtask', id }), [])
+  const openIdea = useCallback((id: string) => setPanel({ kind: 'idea', id }), [])
+  const makeProject = useCallback((ideaId: string) => setPanel({ kind: 'new-project', ideaId }), [])
+  // The new project is active now, so show it where active projects live.
+  function showProjectFromIdea(id: string) {
+    setTab('calendar')
+    setPanel({ kind: 'project', id })
+  }
 
   return (
     // dvh follows Safari's toolbars as they show and hide; the side insets
     // keep clear of the notch in landscape.
     <div className="flex h-dvh flex-col pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)]">
       <TopBar
+        area={tab === 'ideas' ? 'ideas' : 'calendar'}
+        onArea={setTab}
         hasData={Boolean(data?.projects.length || ideas?.length)}
         onNewProject={() => setPanel({ kind: 'new-project' })}
         onNotice={setNotice}
       />
-      <div className="flex min-h-0 flex-1">
+      {/* Hidden rather than removed, so each keeps its place (the month
+          shown, a half-typed idea) while the other is showing. */}
+      <div className={cx('flex min-h-0 flex-1', tab === 'ideas' && 'hidden')}>
         <Sidebar
           data={data}
           today={today}
@@ -82,13 +97,22 @@ function App() {
           />
         </main>
       </div>
+      <IdeasView
+        ideas={ideas}
+        today={today}
+        onOpenIdea={openIdea}
+        onMakeProject={makeProject}
+        className={tab === 'ideas' ? undefined : 'hidden'}
+      />
       <TabBar tab={tab} onChange={setTab} />
-      {panel && data && (
+      {panel && data && ideas && (
         <Panels
           panel={panel}
           data={data}
+          ideas={ideas}
           today={today}
           onNavigate={setPanel}
+          onProjectFromIdea={showProjectFromIdea}
           onNotice={setNotice}
         />
       )}

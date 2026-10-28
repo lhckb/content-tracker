@@ -57,6 +57,22 @@ function newestFirst(a: Idea, b: Idea): number {
   return a.id.localeCompare(b.id)
 }
 
+// 'January' … 'December', for the idea card's month list.
+export const MONTH_NAMES: readonly string[] = Array.from({ length: 12 }, (_, i) =>
+  format(new Date(2000, i, 1), 'MMMM'),
+)
+
+// 'YYYY-MM' for a month number (1–12) and year.
+export function toISOMonth(year: number, month: number): ISOMonth {
+  return `${year}-${String(month).padStart(2, '0')}`
+}
+
+// A month picked without a year: its next occurrence, counting this one.
+export function nextOccurrence(month: number, today: ISODate): ISOMonth {
+  const year = Number(today.slice(0, 4))
+  return toISOMonth(month < Number(today.slice(5, 7)) ? year + 1 : year, month)
+}
+
 // The years the idea card offers: this year to three ahead, plus the idea's
 // own year if it's outside that range.
 export function yearOptions(today: ISODate, month?: ISOMonth): number[] {

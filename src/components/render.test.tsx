@@ -1,20 +1,24 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { beforeAll, describe, expect, it } from 'vitest'
-import { getTrackerData, type TrackerData } from '../data'
+import { getIdeas, getTrackerData, type TrackerData } from '../data'
 import { ARCHIVED_HEX } from '../lib/colors'
 import { loadSampleData } from '../dev/sampleData'
+import type { Idea } from '../types'
 import { CalendarView } from './calendar/CalendarView'
+import { IdeasView } from './ideas/IdeasView'
 import { Sidebar } from './Sidebar'
 
 // Renders the real components to HTML from the sample data, which is laid
 // out like the spec's mockup when today is Thursday, Nov 5, 2026.
 const TODAY = '2026-11-05'
 let data: TrackerData
+let ideas: Idea[]
 const NO_OPENERS = { onOpenProject: () => {}, onOpenSubtask: () => {}, onNotice: () => {} }
 
 beforeAll(async () => {
   await loadSampleData(TODAY)
   data = await getTrackerData()
+  ideas = await getIdeas()
 })
 
 function render(element: React.ReactElement): string {
@@ -89,5 +93,34 @@ describe('Sidebar', () => {
   it('keeps the archive collapsed with a count', () => {
     expect(html()).toContain('▸ Archive · 1 project')
     expect(html()).not.toContain('Coffee grinder review')
+  })
+})
+
+describe('IdeasView', () => {
+  const html = () =>
+    render(<IdeasView ideas={ideas} today={TODAY} onOpenIdea={() => {}} onMakeProject={() => {}} />)
+
+  it('shows a column per platform with its count', () => {
+    expect(html()).toContain('YouTube · 3')
+    expect(html()).toContain('Instagram · 3')
+  })
+
+  it('groups each column by month, a past month first, no month last', () => {
+    const headings = [...html().matchAll(/<h3[^>]*>(.*?)<\/h3>/g)].map((m) =>
+      m[1].replace(/<[^>]+>/g, ''),
+    )
+    expect(headings).toEqual([
+      'December 2026',
+      'February 2027',
+      'No month',
+      'October 2026 · past',
+      'November 2026',
+      'No month',
+    ])
+  })
+
+  it('stays off the calendar', () => {
+    const calendar = render(<CalendarView data={data} today={TODAY} {...NO_OPENERS} />)
+    expect(calendar).not.toContain('Sunrise run timelapse')
   })
 })

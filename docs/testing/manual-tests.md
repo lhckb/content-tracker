@@ -19,6 +19,49 @@ The scripts were throwaway and not committed; their steps are written out below.
 
 ---
 
+## Branch `ideas`: the Ideas area (2026-10-28)
+
+### T-14 · Ideas on the phone · ✅
+- **Where:** the dev server, signed out, in WebKit emulating an iPhone 15, with the sample data.
+- **How:**
+  1. Tap the Ideas tab, then switch to Instagram.
+  2. Add "Rainy day b-roll" with the Add button.
+  3. Open it, pick December and type a description.
+  4. Make project, set a publish date, and Create.
+- **Result:**
+  - There's no Calendar | Ideas switch at this width; the tab bar has Calendar · Projects · Ideas.
+  - One column shows at a time, and the switch flips between YouTube and Instagram.
+  - The idea card is a full-screen sheet.
+  - The New project dialog starts from the idea and shows "Planned for December 2026".
+  - After Create, the project detail opens with the description as its notes, and closing it lands on the Calendar tab. The idea has left Ideas.
+  - No console errors.
+  - The one ❌ in the script was its own mistake: it expected the sheet to be at least 800 points tall, but the emulated iPhone 15 screen is 393×659, and the sheet filled it.
+
+### T-13 · Ideas on desktop · ✅
+- **Where:** the dev server, signed out, in headless Chromium at 1440×900, with the sample data. Today was 2026-10-28.
+- **How and result:**
+
+  | Step | Result |
+  | --- | --- |
+  | Top bar: Calendar → Ideas | The calendar and the sidebar hide; two columns, "YouTube · 3" and "Instagram · 3" |
+  | Month headings | YouTube: November 2026, January 2027, No month. Instagram: September 2026 · past, October 2026, No month |
+  | Type a title in YouTube's "Add an idea…" and press Enter | Added first under No month; the field clears and keeps focus. Enter on an empty field adds nothing |
+  | Open it: the year list before a month is picked | Disabled |
+  | Pick March | The year becomes 2027 (March's next occurrence) |
+  | Pick 2028 and type a description | The card moves under March 2028 and shows the description |
+  | Switch the card to Instagram, then pick No month | It moves to the Instagram column, under No month |
+  | Make project on "Studio lighting on a budget", then Cancel | The idea stays |
+  | Make project again | Title and YouTube filled in; "Planned for November 2026" shown; publish date empty and focused; Create disabled |
+  | Set the date, then Create | Switches to Calendar; the project detail opens with the idea's description as its notes and 0 of 6 done; the project is in the sidebar; the idea has left Ideas |
+  | Delete idea, then confirm | Removed |
+  | Reload | Ideas is still the chosen area |
+  | Back on the calendar | No idea titles on it |
+
+- No console errors.
+- The script's one ❌ was its own mistake: it expected "· PAST" in capitals, but the "past" marker is deliberately lowercase.
+
+---
+
 ## Branch `supabase-sync`: sign-in and sync (2026-10-27)
 
 ### T-11 · Production project setup, through the public API · ✅ except sign-ups

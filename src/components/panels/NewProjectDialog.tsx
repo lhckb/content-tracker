@@ -1,21 +1,26 @@
 import { useId, useState, type FormEvent } from 'react'
-import { createProject } from '../../data'
+import { createProject, makeProjectFromIdea } from '../../data'
 import { isISODate } from '../../lib/dates'
+import { formatIdeaMonth } from '../../lib/ideas'
 import { PLATFORM_LABELS, PLATFORMS } from '../../lib/platforms'
 import { DEFAULT_TASK_TITLES, PUBLISH_TITLE } from '../../lib/template'
-import type { Platform } from '../../types'
+import type { Idea, Platform } from '../../types'
 import { cx } from '../cx'
 import { CloseButton } from './Modal'
 
+// With an `idea`, starts from its title and platform, and creating the
+// project removes the idea (makeProjectFromIdea).
 export function NewProjectDialog({
+  idea,
   onCancel,
   onCreated,
 }: {
+  idea?: Idea
   onCancel: () => void
   onCreated: (projectId: string) => void
 }) {
-  const [title, setTitle] = useState('')
-  const [platform, setPlatform] = useState<Platform>('youtube')
+  const [title, setTitle] = useState(idea?.title ?? '')
+  const [platform, setPlatform] = useState<Platform>(idea?.platform ?? 'youtube')
   const [publishDate, setPublishDate] = useState('')
   const [withDefaults, setWithDefaults] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -26,12 +31,8 @@ export function NewProjectDialog({
     event.preventDefault()
     if (!valid || saving) return
     setSaving(true)
-    const projectId = await createProject({
-      title,
-      platform,
-      publishDate,
-      withDefaultSubtasks: withDefaults,
-    })
+    const input = { title, platform, publishDate, withDefaultSubtasks: withDefaults }
+    const projectId = idea ? await makeProjectFromIdea(idea.id, input) : await createProject(input)
     onCreated(projectId)
   }
 
@@ -41,6 +42,12 @@ export function NewProjectDialog({
         <h2 className="text-lg font-semibold">New project</h2>
         <CloseButton onClick={onCancel} />
       </header>
+      {idea && (
+        <p className="-mt-2 text-sm text-stone-500">
+          From your idea. Once the project is created, the idea leaves Ideas and its description
+          becomes the project's notes.
+        </p>
+      )}
 
       <div className="flex flex-col gap-1">
         <label htmlFor={`${id}-title`} className="text-sm text-stone-600">
@@ -88,6 +95,9 @@ export function NewProjectDialog({
           onChange={(event) => setPublishDate(event.target.value)}
           className="rounded-md border border-stone-300 px-3 py-2 tabular-nums focus:border-blue-500 focus:outline-none"
         />
+        {idea?.month && (
+          <p className="text-xs text-stone-500">Planned for {formatIdeaMonth(idea.month)}</p>
+        )}
       </div>
 
       <label className="flex items-start gap-2 text-sm">
