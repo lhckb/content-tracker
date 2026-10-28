@@ -21,6 +21,22 @@ The scripts were throwaway and not committed; their steps are written out below.
 
 ## Branch `ideas`: the Ideas area (2026-10-28)
 
+### T-17 · The ideas migration on production, from outside · ✅
+- **Where:** the production project's public API, with the publishable key only and signed out, after you ran the migration there.
+- **How:**
+  - Read the tables and call `sync_push` signed out. `42501` means the object exists and refuses anyone signed out; "not found" (`PGRST205` for a table, `PGRST202` for a function) would mean the migration hadn't run.
+  - As a control, call `sync_push` with a made-up argument.
+- **Result:**
+
+  | Check | Result |
+  | --- | --- |
+  | Read `ideas` | ✅ refused (`42501`): the table exists |
+  | Read `projects` | ✅ refused (`42501`) |
+  | `sync_push` with `idea_rows` | ✅ refused (`42501`): the new function exists |
+  | `sync_push` with two lists, as the live app sends | ✅ refused (`42501`): still matches, so the live app keeps syncing |
+  | `sync_push` with a made-up argument (control) | ✅ `PGRST202` "Could not find the function": a missing function would have shown |
+  | Sign-ups | ✅ still off; Google the only provider |
+
 ### T-16 · Ideas syncing between three browsers on the dev project · ✅
 - **Where:** the dev server with `.env.local` pointing at the dev project, after you ran the ideas migration there. Three separate headless Chromium profiles (A, B, C) stand in for three devices; A and B are signed in as the test user from the start.
 - **How and result:**

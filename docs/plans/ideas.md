@@ -1,6 +1,6 @@
 # Plan: Ideas
 
-Status: approved, not started · 2026-10-27. You accepted every recommendation (decisions at the end).
+Status: built and in review · 2026-10-28. The migration has run on dev and production; the checks are T-13 to T-17 in `docs/testing/manual-tests.md`. You accepted every recommendation (decisions at the end).
 
 ## Goal
 
