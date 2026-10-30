@@ -19,6 +19,28 @@ The scripts were throwaway and not committed; their steps are written out below.
 
 ---
 
+## Branch `notifications`: daily reminders (2026-10-30)
+
+### T-26 · The scheduled job's SQL, against stand-ins for pg_net and Vault · ✅
+- **Why:** `npm run test:db` skips scheduling the job, because a plain Postgres has neither pg_cron nor pg_net. So the job's SQL, which runs every minute on Supabase, isn't covered there.
+- **Where:** a throwaway local Postgres 17, with the shim and every migration loaded.
+- **How:** a script stands in for `net.http_post` (same signature as pg_net's: `url`, `body`, `params`, `headers`, `timeout_milliseconds`), recording each call, and for `vault.decrypted_secrets`, holding a made-up address and token. It runs the job's SQL, copied out of the migration, twice: with no device due, then with one device whose time is the current minute.
+- **Result:**
+  - The migration reports "pg_cron or pg_net is missing, so the daily reminder job is not scheduled." and carries on.
+  - With no device due, the job makes **no** call.
+  - With one due, it makes exactly one: to the address from Vault, with headers `Content-Type: application/json` and `x-reminder-token` from Vault, body `{}`, and a 30-second timeout.
+
+### T-25 · `web-push` 3.6.7 under Deno · ✅
+- **Why:** Supabase's Edge Functions run on Deno, not Node, and `web-push` is a Node library. A push that encrypts or signs wrongly is still accepted by the push service, but the phone drops it without a sign.
+- **Where:** Deno 2.9.5 on the Mac.
+- **How:** a script imports `npm:web-push@3.6.7` and makes a push for a made-up subscription. The subscription's keys come from the Web Crypto API, the way a browser makes them. The script then checks the request the way a browser and Apple would: it verifies the VAPID signature with the public key, then decrypts the body (RFC 8291, `aes128gcm`) with the subscription's private key.
+- **Result:**
+  - The request has `Content-Encoding: aes128gcm` and `TTL: 21600`.
+  - The VAPID JWT verifies, with `aud` `https://web.push.apple.com` and `sub` the live site's address.
+  - The body decrypts to the exact payload: `{"title":"You have 3 tasks for 2 projects today, plus 1 overdue"}`.
+
+---
+
 ## Branch `cleanup-tasks`: clean-up tasks (2026-10-28)
 
 ### T-24 · Production after the clean-up migration, from outside · ✅ (what can be seen)
@@ -315,10 +337,13 @@ The scripts were throwaway and not committed; their steps are written out below.
   - The sidebar hint was first reported missing. Waiting for the data to load (about 25 ms after the button appears) showed it was a timing problem in the script; the hint is there.
   - No console errors.
 
-### T-02 · Database migration and access-rule tests on a local Postgres · ⏳ not run
-- **Why:** this Mac has the Postgres client tools but no Postgres server. Downloading a self-contained Postgres into the session's temporary folder was blocked by Claude Code's permission check.
-- **To run:** `brew install postgresql@17`, then `npm run test:db`.
-- T-04, T-07 and T-10 cover the same rules on the real dev project, except an account that exists but isn't on the allowlist.
+### T-02 · Database migration and access-rule tests on a local Postgres · ✅ (first run 2026-10-30, after a fix)
+- **Why it waited:** until 2026-10-30, this Mac had the Postgres client tools but no Postgres server. Downloading a self-contained Postgres into the session's temporary folder was blocked by Claude Code's permission check.
+- **Setup:** `brew install postgresql@17`. Homebrew's post-install step didn't run the first time, so Postgres couldn't find its own files (`initdb: file ".../share/postgresql@17/postgres.bki" does not exist`). Running `brew postinstall postgresql@17` fixed it.
+- **First run:** ❌ The first 20 checks passed, then "Bob cannot update Alice's project" stopped the run: `WITH clause containing a data-modifying statement must be at the top level`. The check had put its `update` in a subquery. So that check and the ones after it had never run, though the migrations themselves loaded fine.
+- **Fix:** on the `notifications` branch, the check runs its `update` at the top level and checks the result. `run-local.sh` now also finds Homebrew's Postgres 17 without `PG_BIN`.
+- **Result:** ✅ all 68 checks pass: the 36 from before, plus 32 daily-reminder checks added on that branch.
+- T-04, T-07 and T-10 cover the same rules on the real dev project, except an account that exists but isn't on the allowlist. Here, that's Carol.
 
 ### T-01 · The app signed out, after the local database gained new tables · ✅
 - **Where:** the dev server with no Supabase settings, in headless Chromium on desktop.

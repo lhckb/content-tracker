@@ -167,12 +167,12 @@ set role authenticated;
 select test.expect((select count(*) = 0 from public.projects), 'Bob cannot see Alice''s projects');
 select test.expect((select count(*) = 0 from public.subtasks), 'Bob cannot see Alice''s subtasks');
 select test.expect((select count(*) = 0 from public.ideas), 'Bob cannot see Alice''s ideas');
-select test.expect(
-  (with changed as (
-    update public.projects set title = 'Hacked' where id = 'f0000000-0000-4000-8000-0000000000aa' returning 1
-  ) select count(*) = 0 from changed),
-  'Bob cannot update Alice''s project'
-);
+-- A data-modifying WITH has to be at the top level, so the update runs here
+-- and the check reads its result.
+with changed as (
+  update public.projects set title = 'Hacked' where id = 'f0000000-0000-4000-8000-0000000000aa' returning 1
+)
+select test.expect((select count(*) = 0 from changed), 'Bob cannot update Alice''s project');
 select test.expect_error(
   $$insert into public.projects (id, user_id, title, platform, color, publish_date, edited_at)
     values (gen_random_uuid(), 'a0000000-0000-4000-8000-000000000001', 'Planted', 'youtube', 'blue', '2026-11-01', now())$$,
@@ -240,4 +240,211 @@ select test.expect((select count(*) = 1 from public.projects), 'nothing else was
 select test.expect(
   (select count(*) = 1 and bool_and(title = 'Reel idea' and deleted) from public.ideas),
   'Alice''s idea is untouched by the others'
+);
+
+-- Daily reminders --------------------------------------------------------------
+--
+-- Most checks are at 8:00 AM in Recife (UTC-3) on Nov 10, 2026: 11:00 UTC.
+
+grant usage on schema test to service_role;
+grant execute on all functions in schema test to service_role;
+
+select test.sign_in('a0000000-0000-4000-8000-000000000001', 'alice@example.com');
+set role authenticated;
+
+insert into public.push_subscriptions (endpoint, p256dh, auth, time_zone, remind_at)
+values ('https://push.example/alice-phone', 'key', 'secret', 'America/Recife', '08:00');
+select test.expect(
+  (select user_id = auth.uid() and last_sent_on is null from public.push_subscriptions),
+  'Alice turns on reminders on her phone, stamped with her user id'
+);
+select test.expect_error(
+  $$insert into public.push_subscriptions (endpoint, p256dh, auth, time_zone)
+    values ('https://push.example/alice-x', 'key', 'secret', 'Mars/Olympus')$$,
+  'an unknown time zone is refused'
+);
+select test.expect_error(
+  $$insert into public.push_subscriptions (endpoint, p256dh, auth, time_zone, remind_at)
+    values ('https://push.example/alice-x', 'key', 'secret', 'America/Recife', '08:00:30')$$,
+  'a reminder time is in whole minutes'
+);
+insert into public.push_subscriptions (endpoint, p256dh, auth, time_zone, remind_at) values
+  ('https://push.example/alice-tablet', 'key', 'secret', 'America/Recife', '07:15'),
+  ('https://push.example/alice-laptop', 'key', 'secret', 'America/Recife', '06:00'),
+  ('https://push.example/alice-late', 'key', 'secret', 'America/Recife', '23:30'),
+  ('https://push.example/alice-old', 'key', 'secret', 'America/Recife', '08:00');
+update public.push_subscriptions set remind_at = '06:30' where endpoint = 'https://push.example/alice-laptop';
+delete from public.push_subscriptions where endpoint = 'https://push.example/alice-old';
+select test.expect(
+  (select count(*) = 4 and bool_or(remind_at = '06:30') from public.push_subscriptions),
+  'Alice can change and remove her own devices'
+);
+select test.expect_error('select public.claim_due_reminders()', 'app users cannot claim reminders');
+select test.expect_error('select public.reminders_due()', 'app users cannot run the job''s check');
+select test.expect_error(
+  $$select public.forget_push_subscriptions(array['https://push.example/alice-phone'])$$,
+  'app users cannot forget devices'
+);
+
+reset role;
+select test.sign_in('b0000000-0000-4000-8000-000000000002', 'bob@example.com');
+set role authenticated;
+
+select test.expect((select count(*) = 0 from public.push_subscriptions), 'Bob cannot see Alice''s devices');
+with changed as (
+  update public.push_subscriptions set remind_at = '03:00' returning 1
+)
+select test.expect((select count(*) = 0 from changed), 'Bob cannot change Alice''s devices');
+with removed as (
+  delete from public.push_subscriptions returning 1
+)
+select test.expect((select count(*) = 0 from removed), 'Bob cannot remove Alice''s devices');
+select test.expect_error(
+  $$insert into public.push_subscriptions (endpoint, user_id, p256dh, auth, time_zone)
+    values ('https://push.example/planted', 'a0000000-0000-4000-8000-000000000001', 'key', 'secret', 'UTC')$$,
+  'Bob cannot save a device as Alice'
+);
+insert into public.push_subscriptions (endpoint, p256dh, auth, time_zone, remind_at)
+values ('https://push.example/bob-phone', 'key', 'secret', 'America/Recife', '08:00');
+
+reset role;
+select test.sign_in('c0000000-0000-4000-8000-000000000003', 'carol@example.com');
+set role authenticated;
+
+select test.expect_error(
+  $$insert into public.push_subscriptions (endpoint, p256dh, auth, time_zone)
+    values ('https://push.example/carol-phone', 'key', 'secret', 'America/Recife')$$,
+  'Carol cannot turn on reminders'
+);
+
+reset role;
+select set_config('request.jwt.claims', '', false);
+set role anon;
+
+select test.expect_error('select * from public.push_subscriptions', 'signed-out requests cannot read devices');
+select test.expect_error('select public.claim_due_reminders()', 'signed-out requests cannot claim reminders');
+
+reset role;
+
+-- The calendar, as the app would sync it. Dave is allowlisted but has no
+-- projects; Carol's device is written here directly, as if she'd been
+-- removed from the allowlist after turning reminders on.
+insert into auth.users (id, email) values ('d0000000-0000-4000-8000-000000000004', 'dave@example.com');
+insert into public.allowed_emails (email) values ('dave@example.com');
+insert into public.push_subscriptions (endpoint, user_id, p256dh, auth, time_zone, remind_at) values
+  ('https://push.example/dave-phone', 'd0000000-0000-4000-8000-000000000004', 'key', 'secret', 'America/Recife', '08:00'),
+  ('https://push.example/carol-phone', 'c0000000-0000-4000-8000-000000000003', 'key', 'secret', 'America/Recife', '08:00');
+
+insert into public.projects (id, user_id, title, platform, color, publish_date, archived, deleted, edited_at)
+select id::uuid, user_id::uuid, title, platform, 'blue', publish_date::date, archived, deleted, now()
+from (values
+  ('e0000000-0000-4000-8000-000000000001', 'a0000000-0000-4000-8000-000000000001', 'Desk tour', 'youtube', '2026-11-20', false, false),
+  ('e0000000-0000-4000-8000-000000000002', 'a0000000-0000-4000-8000-000000000001', 'Packing Reel', 'instagram', '2026-11-10', false, false),
+  ('e0000000-0000-4000-8000-000000000003', 'a0000000-0000-4000-8000-000000000001', 'Old vlog', 'youtube', '2026-11-01', true, false),
+  ('e0000000-0000-4000-8000-000000000004', 'a0000000-0000-4000-8000-000000000001', 'Dropped', 'youtube', '2026-11-30', false, true),
+  ('e0000000-0000-4000-8000-000000000005', 'b0000000-0000-4000-8000-000000000002', 'Bob''s short', 'youtube', '2026-11-12', false, false)
+) as p (id, user_id, title, platform, publish_date, archived, deleted);
+
+insert into public.subtasks (id, user_id, project_id, kind, title, start_date, end_date, done, deleted, sort_order, edited_at)
+select gen_random_uuid(), user_id::uuid, project_id::uuid, kind, title, start_date::date, end_date::date, done, deleted, 0, now()
+from (values
+  -- Desk tour: two for today, two overdue, and three that don't count.
+  ('a0000000-0000-4000-8000-000000000001', 'e0000000-0000-4000-8000-000000000001', 'task', 'Script', '2026-11-10', null, false, false),
+  ('a0000000-0000-4000-8000-000000000001', 'e0000000-0000-4000-8000-000000000001', 'task', 'Edit', '2026-11-09', '2026-11-11', false, false),
+  ('a0000000-0000-4000-8000-000000000001', 'e0000000-0000-4000-8000-000000000001', 'task', 'B-roll (done)', '2026-11-10', null, true, false),
+  ('a0000000-0000-4000-8000-000000000001', 'e0000000-0000-4000-8000-000000000001', 'task', 'A-roll (overdue)', '2026-11-09', null, false, false),
+  ('a0000000-0000-4000-8000-000000000001', 'e0000000-0000-4000-8000-000000000001', 'task', 'Research (overdue)', '2026-11-05', '2026-11-09', false, false),
+  ('a0000000-0000-4000-8000-000000000001', 'e0000000-0000-4000-8000-000000000001', 'task', 'Outline (done)', '2026-11-08', null, true, false),
+  ('a0000000-0000-4000-8000-000000000001', 'e0000000-0000-4000-8000-000000000001', 'task', 'Thumbnail (deleted)', '2026-11-10', null, false, true),
+  -- Packing Reel: Publish and a clean-up task, both today.
+  ('a0000000-0000-4000-8000-000000000001', 'e0000000-0000-4000-8000-000000000002', 'publish', 'Publish', '2026-11-10', null, false, false),
+  ('a0000000-0000-4000-8000-000000000001', 'e0000000-0000-4000-8000-000000000002', 'cleanup', 'Back up footage', '2026-11-10', null, false, false),
+  -- An archived project and a deleted one, which don't count.
+  ('a0000000-0000-4000-8000-000000000001', 'e0000000-0000-4000-8000-000000000003', 'task', 'Edit', '2026-11-10', null, false, false),
+  ('a0000000-0000-4000-8000-000000000001', 'e0000000-0000-4000-8000-000000000003', 'task', 'Script', '2026-11-01', null, false, false),
+  ('a0000000-0000-4000-8000-000000000001', 'e0000000-0000-4000-8000-000000000004', 'task', 'Script', '2026-11-10', null, false, false),
+  ('b0000000-0000-4000-8000-000000000002', 'e0000000-0000-4000-8000-000000000005', 'task', 'Film', '2026-11-10', null, false, false)
+) as s (user_id, project_id, kind, title, start_date, end_date, done, deleted);
+
+-- The scheduled job's check, which runs as the database owner.
+select test.expect(not public.reminders_due('2026-11-10T09:00:00Z'), 'no reminder is due at 6:00 AM');
+select test.expect(
+  (select not public.reminder_is_due(s, '2026-11-10T10:14:00Z') and public.reminder_is_due(s, '2026-11-10T10:15:00Z')
+   from public.push_subscriptions s where endpoint = 'https://push.example/alice-tablet'),
+  'a reminder is due from its minute on, not before: 7:15 AM'
+);
+select test.expect(public.reminders_due('2026-11-10T11:00:00Z'), 'reminders are due at 8:00 AM');
+
+-- The server function's view, with the secret key.
+set role service_role;
+
+create temp table claimed as select * from public.claim_due_reminders('2026-11-10T11:00:00Z');
+select test.expect(
+  (select tasks = 4 and projects = 2 and overdue = 2 from claimed where endpoint = 'https://push.example/alice-phone'),
+  'Alice''s phone: 4 tasks for 2 projects today, plus 2 overdue'
+);
+select test.expect(
+  (select tasks = 4 and overdue = 2 from claimed where endpoint = 'https://push.example/alice-tablet'),
+  'a late run still sends: the tablet''s 7:15 AM reminder, 45 minutes on'
+);
+select test.expect(
+  not exists (select 1 from claimed where endpoint = 'https://push.example/alice-laptop'),
+  'but not an hour or more on: the laptop''s 6:30 AM one'
+);
+select test.expect(
+  (select tasks = 1 and projects = 1 and overdue = 0 from claimed where endpoint = 'https://push.example/bob-phone'),
+  'Bob''s phone counts only his own tasks'
+);
+select test.expect(
+  not exists (select 1 from claimed where endpoint = 'https://push.example/dave-phone'),
+  'a device with nothing today and nothing overdue gets nothing'
+);
+select test.expect(
+  not exists (select 1 from claimed where endpoint = 'https://push.example/carol-phone'),
+  'an account that isn''t on the allowlist gets nothing'
+);
+select test.expect((select count(*) = 3 from claimed), 'nothing else is claimed');
+reset role;
+select test.expect(
+  (select last_sent_on = '2026-11-10' from public.push_subscriptions where endpoint = 'https://push.example/dave-phone'),
+  'the empty day is still marked as sent'
+);
+set role service_role;
+
+select test.expect(
+  not exists (select 1 from public.claim_due_reminders('2026-11-10T11:05:00Z')),
+  'at most once a day: a run five minutes later sends nothing'
+);
+reset role;
+select test.expect(not public.reminders_due('2026-11-10T11:05:00Z'), 'and the job''s check agrees');
+set role service_role;
+select test.expect(
+  not exists (select 1 from public.claim_due_reminders('2026-11-11T03:10:00Z')),
+  'an 11:30 PM reminder never goes out after midnight'
+);
+select test.expect(
+  (select count(*) = 1 and bool_and(endpoint = 'https://push.example/alice-late')
+   from public.claim_due_reminders('2026-11-11T02:40:00Z')),
+  'it goes out at 11:40 PM, within its hour'
+);
+select test.expect(
+  (select tasks = 0 and projects = 0 and overdue = 1
+   from public.claim_due_reminders('2026-11-12T11:00:00Z') where endpoint = 'https://push.example/bob-phone'),
+  'a day with only overdue tasks still sends'
+);
+
+reset role;
+delete from public.allowed_emails where email = 'bob@example.com';
+set role service_role;
+
+select test.expect(
+  not exists (select 1 from public.claim_due_reminders('2026-11-13T11:00:00Z') where endpoint = 'https://push.example/bob-phone'),
+  'removing someone from the allowlist stops their reminders'
+);
+select public.forget_push_subscriptions(array['https://push.example/alice-tablet']);
+
+reset role;
+select test.expect(
+  not exists (select 1 from public.push_subscriptions where endpoint = 'https://push.example/alice-tablet'),
+  'a device the push service says is gone is forgotten'
 );
