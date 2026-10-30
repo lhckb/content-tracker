@@ -76,6 +76,7 @@ function App() {
         onArea={setTab}
         hasData={Boolean(data?.projects.length || ideas?.length)}
         onNewProject={() => setPanel({ kind: 'new-project' })}
+        onOpenNotifications={() => setPanel({ kind: 'notifications' })}
         onNotice={setNotice}
       />
       {/* Hidden rather than removed, so each keeps its place (the month

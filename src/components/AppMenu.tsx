@@ -4,6 +4,7 @@ import {
   clearAllData,
   exportBackupText,
   importBackupText,
+  notificationsAvailable,
   useAccount,
 } from '../data'
 import { loadSampleData } from '../dev/sampleData'
@@ -11,13 +12,15 @@ import { projectsAndIdeas } from '../lib/plural'
 import { ask } from './ask'
 import { cx } from './cx'
 
-// The "⋯" menu in the top bar: backup export/import, plus sample data and
-// a reset while running the dev server.
+// The "⋯" menu in the top bar: backup export/import and notifications, plus
+// sample data and a reset while running the dev server.
 export function AppMenu({
   hasData,
+  onOpenNotifications,
   onNotice,
 }: {
   hasData: boolean
+  onOpenNotifications: () => void
   onNotice: (message: string) => void
 }) {
   const account = useAccount()
@@ -132,6 +135,16 @@ export function AppMenu({
           >
             Import backup…
           </MenuItem>
+          {notificationsAvailable() && (
+            <MenuItem
+              onClick={() => {
+                setOpen(false)
+                onOpenNotifications()
+              }}
+            >
+              Notifications…
+            </MenuItem>
+          )}
           {import.meta.env.DEV && (
             <>
               <div className="my-1 border-t border-stone-100" />

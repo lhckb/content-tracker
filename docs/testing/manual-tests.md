@@ -21,6 +21,27 @@ The scripts were throwaway and not committed; their steps are written out below.
 
 ## Branch `notifications`: daily reminders (2026-10-30)
 
+### T-28 · The Notifications card, the service worker, and turning on before the dev migration · ✅
+- **Where:** the dev server on 5179, with `.env.local` (dev project) plus a throwaway `VITE_VAPID_PUBLIC_KEY` (public half only). Each check uses its own fresh browser profile.
+  - Desktop runs in full Chromium in new headless mode. Playwright's default headless shell always reports notifications as "denied", and the card rightly showed "blocked" there.
+  - Phone runs in WebKit emulating an iPhone 15.
+  - Signed-in checks use the dev test user.
+- **How and result:**
+
+  | Check | Result |
+  | --- | --- |
+  | The service worker at startup | Registered, `http://localhost:5179/sw.js` |
+  | Signed out: ⋯, Notifications… | "Sign in to get notifications. They count the tasks in your account." The switch and the time (08:00) are disabled, and the line reads 'Every day at 8:00 AM: "You have 3 tasks for 2 projects today, plus 1 overdue." Nothing on days with nothing to do.' |
+  | Pushes delivered to the service worker through Chromium's DevTools (`ServiceWorker.deliverPushMessage`) | It shows "You have 2 tasks for 1 project today", with tag `daily-reminder` and the app's icon. The next push replaces it rather than adding a second notification. A push that isn't the function's JSON shows "Content Tracker". |
+  | Signed in, permission granted | The switch is off and can be used, with no reason shown. Typing 07:30 updates the line to "7:30 AM" after a pause. |
+  | Turning on, before the dev project has the migration (a stand-in replaces `PushManager.subscribe`, since headless browsers can't reach a real push service) | The card shows "Couldn't turn on reminders: Could not find the table 'public.push_subscriptions' in the schema cache". The new subscription is dropped again, and the switch stays off. |
+  | Signed in, `Notification.permission` denied | "Notifications are blocked for Content Tracker. Allow them in your device's settings, then come back here." The switch is disabled. |
+  | iPhone Safari tab (WebKit, `navigator.standalone` false, no `PushManager`) | "On iPhone, notifications work in the Home Screen app. In Safari, tap Share, then Add to Home Screen." The card fills the screen (393×659). |
+  | Plain Playwright WebKit as an iPhone, with nothing stubbed | It reports the same as an iPhone Safari tab. |
+
+- **Console:** the one error is the 404 for the missing table, in the turning-on check.
+- **Waits for your dev setup:** turning on for real, changing the time, turning off, signing out, and a reminder arriving.
+
 ### T-27 · The daily-reminder function, run for real under Deno against stand-ins · ✅
 - **Why:** the function can't run on Supabase until you've set it up there, and Vitest only covers its logic, not how it uses web-push and supabase-js.
 - **Where:** Deno 2.9.5 on the Mac. The real `supabase/functions/daily-reminder/index.ts` runs with its own `deno.json`, as Supabase would run it.

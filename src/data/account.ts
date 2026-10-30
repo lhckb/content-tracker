@@ -1,6 +1,7 @@
 import type { User } from '@supabase/supabase-js'
 import { useSyncExternalStore } from 'react'
 import { deleteAccountSpace, switchSpace } from './db'
+import { refreshNotifications, turnOffNotifications } from './notifications'
 import { openedAt, supabase, supabaseServer } from './supabase'
 import { countPendingChanges, startSync, type SyncEngine } from './sync'
 
@@ -69,6 +70,7 @@ function follow(user: User | null): void {
     email: user.email ?? '',
     name: (user.user_metadata?.full_name as string | undefined) ?? user.email ?? '',
   })
+  void refreshNotifications().catch((error: unknown) => console.warn('Reminders were not refreshed:', error))
 }
 
 // Leaves for Google's sign-in page; Supabase brings the browser back here.
@@ -93,6 +95,8 @@ export async function signOut({ discardUnsynced = false } = {}): Promise<SignOut
   await engine?.syncNow()
   const unsynced = await countPendingChanges()
   if (unsynced > 0 && !discardUnsynced) return { ok: false, unsynced }
+  // Reminders belong to the account, so they stop on this device.
+  await turnOffNotifications()
   engine?.stop()
   engine = null
   await supabase.auth.signOut()

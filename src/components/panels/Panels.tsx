@@ -3,6 +3,7 @@ import type { ISODate, Idea } from '../../types'
 import { IdeaCard } from './IdeaCard'
 import { Modal } from './Modal'
 import { NewProjectDialog } from './NewProjectDialog'
+import { NotificationsCard } from './NotificationsCard'
 import { ProjectDetail } from './ProjectDetail'
 import { SubtaskCard } from './SubtaskCard'
 
@@ -14,6 +15,7 @@ export type Panel =
   | { kind: 'project'; id: string }
   | { kind: 'subtask'; id: string }
   | { kind: 'idea'; id: string }
+  | { kind: 'notifications' }
 
 export function Panels({
   panel,
@@ -52,6 +54,14 @@ export function Panels({
           onCancel={close}
           onCreated={(id) => (idea ? onProjectFromIdea(id) : onNavigate({ kind: 'project', id }))}
         />
+      </Modal>
+    )
+  }
+
+  if (panel.kind === 'notifications') {
+    return (
+      <Modal key="notifications" label="Notifications" size="small" onClose={close}>
+        <NotificationsCard onClose={close} />
       </Modal>
     )
   }
