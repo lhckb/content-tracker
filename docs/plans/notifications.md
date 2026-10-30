@@ -3,11 +3,11 @@
 Status: built and in review · 2026-10-30. You answered A–D and chose the recommendation for N.
 
 You handle the Supabase side, following "Setting up a Supabase project" below:
-1. You set up dev.
-2. I run the dev checks.
+1. ✅ You set up dev.
+2. ✅ I ran the dev checks (T-29), and you got a real reminder on dev (T-30).
 3. You set up production, before merging.
 
-The checks so far are T-02 and T-25 to T-28 in `docs/testing/manual-tests.md`.
+The checks so far are T-02 and T-25 to T-30 in `docs/testing/manual-tests.md`.
 
 ## Goal
 

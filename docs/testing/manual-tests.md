@@ -21,6 +21,27 @@ The scripts were throwaway and not committed; their steps are written out below.
 
 ## Branch `notifications`: daily reminders (2026-10-30)
 
+### T-30 · A real reminder on the dev project (done by you) · ✅ (as reported)
+- **Where:** your dev server on the Mac, against the dev project, after you set it up (migration, keys, function secrets, Vault, the function deployed with its JWT check off, `VITE_VAPID_PUBLIC_KEY` in `.env.local`).
+- **Result, as you reported it:** "it works on dev I just tested here locally." The browser and the exact steps weren't stated.
+- **Before that:** the first deploy failed with `Entrypoint path does not exist`, because the CLI was run from inside `supabase/`. Deploying from the repo root worked, and the plan's setup steps now say so.
+
+### T-29 · Notifications against the dev project, after its setup · ✅
+- **Where:** the dev server on 5179 with `.env.local` (dev project and its `VITE_VAPID_PUBLIC_KEY`), in full Chromium (new headless), signed in as the dev test user. A stand-in replaces the browser's push service, since headless browsers can't reach a real one. The function's push to that made-up address fails, which is expected here. T-27 and T-30 cover real delivery.
+- **How:** the script reads the account's `push_subscriptions` rows through the API as the test user (publishable key only) after each step.
+- **Result:**
+
+  | Step | Result |
+  | --- | --- |
+  | Before | The test account has no devices |
+  | Turn on, with the time one minute ahead | One row: `America/Recife`, `16:36:00`, not yet sent. Reopening the card shows it on, at 16:36. |
+  | Wait for the scheduled job | `last_sent_on` became 2026-10-30 **48 s** later, when that minute came. So the every-minute job, its `reminders_due()` check, the token from Vault, the deployed function and its claim with the secret key all work on dev. |
+  | Change the time to 21:15 | The row has `21:15:00`, and `last_sent_on` is cleared, so the day starts afresh |
+  | Turn off | The row is gone |
+  | Turn on again, then sign out | The row is gone again |
+
+- No console errors. The test account ends with no devices.
+
 ### T-28 · The Notifications card, the service worker, and turning on before the dev migration · ✅
 - **Where:** the dev server on 5179, with `.env.local` (dev project) plus a throwaway `VITE_VAPID_PUBLIC_KEY` (public half only). Each check uses its own fresh browser profile.
   - Desktop runs in full Chromium in new headless mode. Playwright's default headless shell always reports notifications as "denied", and the card rightly showed "blocked" there.
