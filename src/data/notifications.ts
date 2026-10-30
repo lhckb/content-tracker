@@ -20,8 +20,13 @@ export type NotificationStatus =
   // This build has no Supabase project or push key.
   | { state: 'unavailable' }
   | { state: 'signed-out' }
+  // Opened from a plain http address, such as npm run dev:phone's:
+  // browsers only allow push on secure (https) ones.
+  | { state: 'insecure' }
   // An iPhone or iPad Safari tab: push only exists in Home Screen apps.
   | { state: 'needs-home-screen' }
+  // A Home Screen app on iOS before 16.4, which has no push.
+  | { state: 'update-ios' }
   | { state: 'unsupported' }
   | { state: 'blocked' }
   | { state: 'off' }
@@ -42,17 +47,23 @@ export function registerServiceWorker(): void {
   })
 }
 
-// What this browser can do about push. On iOS, a Safari tab has
-// navigator.standalone false and no PushManager; the Home Screen app has both.
+// What this browser can do about push. Over plain http there's none at all
+// (no service worker either). On iOS, a Safari tab has navigator.standalone
+// false and no PushManager; the Home Screen app has both from iOS 16.4.
 export function pushSupport({
+  secure,
   hasPush,
   standalone,
 }: {
+  secure: boolean
   hasPush: boolean
   standalone: boolean | undefined
-}): 'ok' | 'needs-home-screen' | 'unsupported' {
+}): 'ok' | 'insecure' | 'needs-home-screen' | 'update-ios' | 'unsupported' {
+  if (!secure) return 'insecure'
   if (hasPush) return 'ok'
-  return standalone === false ? 'needs-home-screen' : 'unsupported'
+  if (standalone === false) return 'needs-home-screen'
+  if (standalone === true) return 'update-ios'
+  return 'unsupported'
 }
 
 export async function notificationStatus(account: Account): Promise<NotificationStatus> {
@@ -162,6 +173,7 @@ export function toReminderTime(value: string): ReminderTime {
 
 function browserPushSupport() {
   return pushSupport({
+    secure: window.isSecureContext,
     hasPush: 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window,
     standalone: (navigator as Navigator & { standalone?: boolean }).standalone,
   })

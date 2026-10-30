@@ -11,16 +11,29 @@ import {
 import { useAutosave } from '../../hooks/useAutosave'
 import { formatClock } from '../../lib/dates'
 import { cx } from '../cx'
+import { WarningIcon } from '../WarningIcon'
 import { CloseButton } from './Modal'
 
 // Why the switch can't be used, for each state that disables it.
-const REASONS: Partial<Record<NotificationStatus['state'], string>> = {
-  unavailable: "Notifications aren't set up in this version of the app.",
-  'signed-out': 'Sign in to get notifications. They count the tasks in your account.',
-  'needs-home-screen':
-    'On iPhone, notifications work in the Home Screen app. In Safari, tap Share, then Add to Home Screen.',
-  blocked: "Notifications are blocked for Content Tracker. Allow them in your device's settings, then come back here.",
-  unsupported: "This browser can't show notifications.",
+function reasonFor(state: NotificationStatus['state']): string | null {
+  switch (state) {
+    case 'unavailable':
+      return "Notifications aren't set up in this version of the app."
+    case 'signed-out':
+      return 'Sign in to get notifications. They count the tasks in your account.'
+    case 'insecure':
+      return `Notifications only work when the app is opened from a secure (https) address. This copy is open at ${window.location.origin}, so the browser turns them off. Use the live site instead.`
+    case 'needs-home-screen':
+      return 'On iPhone, notifications work in the Home Screen app. In Safari, tap Share, then Add to Home Screen.'
+    case 'update-ios':
+      return 'Notifications in Home Screen apps need iOS 16.4 or later. Update in Settings, General, Software Update.'
+    case 'blocked':
+      return "Notifications are blocked for Content Tracker. Allow them in your device's settings, then come back here."
+    case 'unsupported':
+      return "This browser can't show notifications."
+    default:
+      return null
+  }
 }
 
 // The ⋯ menu's Notifications card: the daily reminder on this device.
@@ -75,7 +88,7 @@ export function NotificationsCard({ onClose }: { onClose: () => void }) {
       .finally(() => setBusy(false))
   }
 
-  const reason = status && REASONS[status.state]
+  const reason = status && reasonFor(status.state)
   return (
     <div className="flex flex-col gap-4 p-6">
       <header className="flex items-center">
@@ -127,13 +140,22 @@ export function NotificationsCard({ onClose }: { onClose: () => void }) {
       </p>
 
       {status === null && !error && <p className="text-sm text-stone-500">Checking this device…</p>}
-      {reason && <p className="rounded-md bg-stone-100 px-3 py-2 text-sm text-stone-700">{reason}</p>}
-      {error && (
-        <p role="alert" className="text-sm text-red-700">
-          {error}
-        </p>
-      )}
+      {reason && <Warning>{reason}</Warning>}
+      {error && <Warning alert>{error}</Warning>}
     </div>
+  )
+}
+
+// Why reminders can't be turned on, or what went wrong, outlined in red.
+function Warning({ alert = false, children }: { alert?: boolean; children: string }) {
+  return (
+    <p
+      role={alert ? 'alert' : undefined}
+      className="flex items-start gap-2 rounded-md border border-red-300 bg-red-50 px-3 py-2.5 text-sm leading-relaxed text-red-800"
+    >
+      <WarningIcon className="mt-0.5 size-4 shrink-0" />
+      <span>{children}</span>
+    </p>
   )
 }
 

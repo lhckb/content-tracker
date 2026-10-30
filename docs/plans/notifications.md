@@ -7,7 +7,7 @@ You handle the Supabase side, following "Setting up a Supabase project" below:
 2. ✅ I ran the dev checks (T-29), and you got a real reminder on dev (T-30).
 3. ✅ You set up production, and I checked it from outside (T-31). Next: you merge, then turn reminders on in the iPhone's Home Screen app.
 
-The checks so far are T-02 and T-25 to T-31 in `docs/testing/manual-tests.md`.
+The checks so far are T-02 and T-25 to T-32 in `docs/testing/manual-tests.md`.
 
 ## Goal
 
@@ -40,11 +40,13 @@ A **Notifications…** item in the ⋯ menu opens a small card. On the phone, it
 - **A "Daily reminder on this device" switch.** The first time you turn it on, the device asks for permission.
 - **Time:** any time of day, to the minute, using the device's own time picker (decision A). It's set to 8:00 AM at first.
 - **A line saying what it does:** "Every day at 8:00 AM: 'You have 3 tasks for 2 projects today, plus 1 overdue.' Nothing on days with nothing to do."
-- **When it can't be turned on,** the switch is disabled and a line says why:
+- **When it can't be turned on,** the switch is disabled and a warning says why. It has a red outline and a warning sign, and errors use the same style:
   - signed out: "Sign in to get notifications. They count the tasks in your account."
+  - opened from a plain http address, such as `npm run dev:phone`'s: "Notifications only work when the app is opened from a secure (https) address. This copy is open at http://…, so the browser turns them off. Use the live site instead."
   - an iPhone Safari tab: "On iPhone, notifications work in the Home Screen app. In Safari, tap Share, then Add to Home Screen."
+  - a Home Screen app on iOS before 16.4: "Notifications in Home Screen apps need iOS 16.4 or later. Update in Settings, General, Software Update."
   - permission refused: "Notifications are blocked for Content Tracker. Allow them in your device's settings, then come back here."
-  - a browser without push: "This browser can't show notifications."
+  - any other browser without push: "This browser can't show notifications."
 - **Builds without Supabase, or without the push key,** don't show the menu item.
 
 ### The notification

@@ -21,6 +21,28 @@ The scripts were throwaway and not committed; their steps are written out below.
 
 ## Branch `notifications`: daily reminders (2026-10-30)
 
+### T-32 · The iPhone Home Screen app on the dev server says "This browser can't show notifications" (reported by you) · ❌, then ✅ after a fix
+- **What you saw:** your Home Screen app's Notifications card said "This browser can't show notifications."
+- **Why:**
+  - PR #7 wasn't merged yet, so the live site had no notifications at all: its `sw.js` returned 404.
+  - The card had to come from `npm run dev:phone`, which was running and serving `http://luiss-macbook-air.local:5173`.
+  - iOS only gives service workers and push to secure (https) addresses. So over plain http the app saw no push support, and in a Home Screen app that fell through to the generic message.
+  - The plan's risks list had expected this: the iPhone can only be tested on the live site.
+- **Fix:**
+  - The card now tells this case apart and says so. It also has its own message for a Home Screen app on iOS older than 16.4.
+  - At your request, every warning in the card now has a red outline and a warning sign.
+  - Vitest now ignores `.env.local`'s Supabase and push settings, so tests run as in CI. Once `.env.local` had the dev push key, one test had failed locally only.
+- **Checked:** the dev server on 5179, opened by the Mac's network name.
+
+  | Check | Result |
+  | --- | --- |
+  | WebKit as an iPhone with the Home Screen flag on, at `http://luiss-macbook-air.local:5179` | `isSecureContext` false, no service worker. The card shows, outlined in red with the warning sign: "Notifications only work when the app is opened from a secure (https) address. This copy is open at http://luiss-macbook-air.local:5179, so the browser turns them off. Use the live site instead." The switch is disabled. |
+  | The same app at `http://localhost:5179` (secure) | No warning, and the switch can be used |
+  | Desktop, notifications blocked | The same red warning style |
+
+  No console errors. `npm test`: 174 pass.
+- **Still to do:** the real iPhone check happens on the live site after the merge.
+
 ### T-31 · Production after its notifications setup · ✅
 - **Setup, run by you** from the repo root with the Supabase and GitHub CLIs. Claude Code's safety check blocked me from changing production, so I prepared the commands:
   1. The migration, wrapped in one transaction, through `supabase db query --linked`.

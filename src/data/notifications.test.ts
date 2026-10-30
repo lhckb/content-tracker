@@ -3,17 +3,27 @@ import { notificationStatus, notificationsAvailable, pushSupport, toReminderTime
 
 describe('notifications', () => {
   it('can be turned on where the browser has push', () => {
-    expect(pushSupport({ hasPush: true, standalone: undefined })).toBe('ok')
+    expect(pushSupport({ secure: true, hasPush: true, standalone: undefined })).toBe('ok')
     // The iPhone's Home Screen app.
-    expect(pushSupport({ hasPush: true, standalone: true })).toBe('ok')
+    expect(pushSupport({ secure: true, hasPush: true, standalone: true })).toBe('ok')
+  })
+
+  it('needs a secure address first, even in the Home Screen app', () => {
+    // npm run dev:phone's http address, added to the Home Screen.
+    expect(pushSupport({ secure: false, hasPush: false, standalone: true })).toBe('insecure')
+    expect(pushSupport({ secure: false, hasPush: false, standalone: undefined })).toBe('insecure')
   })
 
   it('points an iPhone Safari tab to the Home Screen app', () => {
-    expect(pushSupport({ hasPush: false, standalone: false })).toBe('needs-home-screen')
+    expect(pushSupport({ secure: true, hasPush: false, standalone: false })).toBe('needs-home-screen')
+  })
+
+  it('asks for a newer iOS in a Home Screen app without push', () => {
+    expect(pushSupport({ secure: true, hasPush: false, standalone: true })).toBe('update-ios')
   })
 
   it('says other browsers without push simply can not', () => {
-    expect(pushSupport({ hasPush: false, standalone: undefined })).toBe('unsupported')
+    expect(pushSupport({ secure: true, hasPush: false, standalone: undefined })).toBe('unsupported')
   })
 
   it('reads the time Postgres returns as HH:MM', () => {
