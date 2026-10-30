@@ -3,6 +3,7 @@ import {
   differenceInCalendarDays,
   format,
   isValid,
+  parse,
   parseISO,
 } from 'date-fns'
 import type { ISODate } from '../types'
@@ -79,4 +80,9 @@ export function formatDateRange(start: ISODate, end?: ISODate): string {
     return `${formatShortDate(start)}–${format(parseISO(end), 'd')}`
   }
   return `${formatShortDate(start)} – ${formatShortDate(end)}`
+}
+
+// A time of day, 'HH:MM' (24-hour), as '8:00 AM' or '6:30 PM'.
+export function formatClock(time: string): string {
+  return format(parse(time, 'HH:mm', new Date(2000, 0, 1)), 'h:mm a')
 }

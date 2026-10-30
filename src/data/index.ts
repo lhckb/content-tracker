@@ -26,6 +26,17 @@ export {
 } from './account'
 export { countPendingChanges, useSyncStatus, type SyncStatus } from './sync'
 export {
+  DEFAULT_REMINDER_TIME,
+  notificationStatus,
+  notificationsAvailable,
+  registerServiceWorker,
+  setReminderTime,
+  turnOffNotifications,
+  turnOnNotifications,
+  type NotificationStatus,
+  type ReminderTime,
+} from './notifications'
+export {
   backupFileName,
   BackupError,
   clearAllData,

@@ -9,12 +9,14 @@ export function TopBar({
   onArea,
   hasData,
   onNewProject,
+  onOpenNotifications,
   onNotice,
 }: {
   area: Area
   onArea: (area: Area) => void
   hasData: boolean
   onNewProject: () => void
+  onOpenNotifications: () => void
   onNotice: (message: string) => void
 }) {
   return (
@@ -49,7 +51,7 @@ export function TopBar({
           + <span className="max-md:sr-only">New project</span>
         </button>
         <AccountButton onNotice={onNotice} />
-        <AppMenu hasData={hasData} onNotice={onNotice} />
+        <AppMenu hasData={hasData} onOpenNotifications={onOpenNotifications} onNotice={onNotice} />
       </div>
     </header>
   )

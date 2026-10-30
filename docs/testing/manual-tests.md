@@ -19,6 +19,127 @@ The scripts were throwaway and not committed; their steps are written out below.
 
 ---
 
+## Branch `notifications`: daily reminders (2026-10-30)
+
+### T-32 · The iPhone Home Screen app on the dev server says "This browser can't show notifications" (reported by you) · ❌, then ✅ after a fix
+- **What you saw:** your Home Screen app's Notifications card said "This browser can't show notifications."
+- **Why:**
+  - PR #7 wasn't merged yet, so the live site had no notifications at all: its `sw.js` returned 404.
+  - The card had to come from `npm run dev:phone`, which was running and serving `http://luiss-macbook-air.local:5173`.
+  - iOS only gives service workers and push to secure (https) addresses. So over plain http the app saw no push support, and in a Home Screen app that fell through to the generic message.
+  - The plan's risks list had expected this: the iPhone can only be tested on the live site.
+- **Fix:**
+  - The card now tells this case apart and says so. It also has its own message for a Home Screen app on iOS older than 16.4.
+  - At your request, every warning in the card now has a red outline and a warning sign.
+  - Vitest now ignores `.env.local`'s Supabase and push settings, so tests run as in CI. Once `.env.local` had the dev push key, one test had failed locally only.
+- **Checked:** the dev server on 5179, opened by the Mac's network name.
+
+  | Check | Result |
+  | --- | --- |
+  | WebKit as an iPhone with the Home Screen flag on, at `http://luiss-macbook-air.local:5179` | `isSecureContext` false, no service worker. The card shows, outlined in red with the warning sign: "Notifications only work when the app is opened from a secure (https) address. This copy is open at http://luiss-macbook-air.local:5179, so the browser turns them off. Use the live site instead." The switch is disabled. |
+  | The same app at `http://localhost:5179` (secure) | No warning, and the switch can be used |
+  | Desktop, notifications blocked | The same red warning style |
+
+  No console errors. `npm test`: 174 pass.
+- **Still to do:** the real iPhone check happens on the live site after the merge.
+
+### T-31 · Production after its notifications setup · ✅
+- **Setup, run by you** from the repo root with the Supabase and GitHub CLIs. Claude Code's safety check blocked me from changing production, so I prepared the commands:
+  1. The migration, wrapped in one transaction, through `supabase db query --linked`.
+  2. A one-off script that ran `scripts/notification-keys.mjs` for production and handed the keys straight to `supabase secrets set` and to Vault, without printing the private key or the token. It also set the GitHub variable `VITE_VAPID_PUBLIC_KEY` to production's public key. Before that, the variable held **dev's** key, which would have made push services refuse every reminder on the live site.
+  3. `supabase functions deploy daily-reminder --no-verify-jwt`.
+- **Checks, read-only:**
+
+  | Check | Result |
+  | --- | --- |
+  | Database, through `supabase db query` | `push_subscriptions` exists with 0 devices. pg_cron 1.6.4 and pg_net 0.20.4 are on. The `daily-reminder` job runs every minute (`* * * * *`, active), and its last runs succeeded (19:44, 19:45). Vault has `daily_reminder_url` and `daily_reminder_token`. `reminders_due()` is false. |
+  | Function, through `supabase functions list` and `secrets list` | `daily-reminder` is active, with `verify_jwt` false. Its secrets include `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` and `REMINDER_TOKEN`. |
+  | The function from outside | No token: **403**. A wrong token: **403** "Forbidden". GET: **405**. |
+  | The API signed out, with the publishable key | Reading `push_subscriptions`, `claim_due_reminders` and `forget_push_subscriptions` all get **42501** (permission denied) |
+  | GitHub variable | It's now production's key, not dev's, and its SHA-256 equals the digest Supabase lists for the function's `VAPID_PUBLIC_KEY`. So the live build subscribes with the key the function signs with. |
+
+- **Not checked from outside:** a real reminder on production. That comes after the merge, on the iPhone's Home Screen app.
+
+### T-30 · A real reminder on the dev project (done by you) · ✅ (as reported)
+- **Where:** your dev server on the Mac, against the dev project, after you set it up (migration, keys, function secrets, Vault, the function deployed with its JWT check off, `VITE_VAPID_PUBLIC_KEY` in `.env.local`).
+- **Result, as you reported it:** "it works on dev I just tested here locally." The browser and the exact steps weren't stated.
+- **Before that:** the first deploy failed with `Entrypoint path does not exist`, because the CLI was run from inside `supabase/`. Deploying from the repo root worked, and the plan's setup steps now say so.
+
+### T-29 · Notifications against the dev project, after its setup · ✅
+- **Where:** the dev server on 5179 with `.env.local` (dev project and its `VITE_VAPID_PUBLIC_KEY`), in full Chromium (new headless), signed in as the dev test user. A stand-in replaces the browser's push service, since headless browsers can't reach a real one. The function's push to that made-up address fails, which is expected here. T-27 and T-30 cover real delivery.
+- **How:** the script reads the account's `push_subscriptions` rows through the API as the test user (publishable key only) after each step.
+- **Result:**
+
+  | Step | Result |
+  | --- | --- |
+  | Before | The test account has no devices |
+  | Turn on, with the time one minute ahead | One row: `America/Recife`, `16:36:00`, not yet sent. Reopening the card shows it on, at 16:36. |
+  | Wait for the scheduled job | `last_sent_on` became 2026-10-30 **48 s** later, when that minute came. So the every-minute job, its `reminders_due()` check, the token from Vault, the deployed function and its claim with the secret key all work on dev. |
+  | Change the time to 21:15 | The row has `21:15:00`, and `last_sent_on` is cleared, so the day starts afresh |
+  | Turn off | The row is gone |
+  | Turn on again, then sign out | The row is gone again |
+
+- No console errors. The test account ends with no devices.
+
+### T-28 · The Notifications card, the service worker, and turning on before the dev migration · ✅
+- **Where:** the dev server on 5179, with `.env.local` (dev project) plus a throwaway `VITE_VAPID_PUBLIC_KEY` (public half only). Each check uses its own fresh browser profile.
+  - Desktop runs in full Chromium in new headless mode. Playwright's default headless shell always reports notifications as "denied", and the card rightly showed "blocked" there.
+  - Phone runs in WebKit emulating an iPhone 15.
+  - Signed-in checks use the dev test user.
+- **How and result:**
+
+  | Check | Result |
+  | --- | --- |
+  | The service worker at startup | Registered, `http://localhost:5179/sw.js` |
+  | Signed out: ⋯, Notifications… | "Sign in to get notifications. They count the tasks in your account." The switch and the time (08:00) are disabled, and the line reads 'Every day at 8:00 AM: "You have 3 tasks for 2 projects today, plus 1 overdue." Nothing on days with nothing to do.' |
+  | Pushes delivered to the service worker through Chromium's DevTools (`ServiceWorker.deliverPushMessage`) | It shows "You have 2 tasks for 1 project today", with tag `daily-reminder` and the app's icon. The next push replaces it rather than adding a second notification. A push that isn't the function's JSON shows "Content Tracker". |
+  | Signed in, permission granted | The switch is off and can be used, with no reason shown. Typing 07:30 updates the line to "7:30 AM" after a pause. |
+  | Turning on, before the dev project has the migration (a stand-in replaces `PushManager.subscribe`, since headless browsers can't reach a real push service) | The card shows "Couldn't turn on reminders: Could not find the table 'public.push_subscriptions' in the schema cache". The new subscription is dropped again, and the switch stays off. |
+  | Signed in, `Notification.permission` denied | "Notifications are blocked for Content Tracker. Allow them in your device's settings, then come back here." The switch is disabled. |
+  | iPhone Safari tab (WebKit, `navigator.standalone` false, no `PushManager`) | "On iPhone, notifications work in the Home Screen app. In Safari, tap Share, then Add to Home Screen." The card fills the screen (393×659). |
+  | Plain Playwright WebKit as an iPhone, with nothing stubbed | It reports the same as an iPhone Safari tab. |
+
+- **Console:** the one error is the 404 for the missing table, in the turning-on check.
+- **Waits for your dev setup:** turning on for real, changing the time, turning off, signing out, and a reminder arriving.
+
+### T-27 · The daily-reminder function, run for real under Deno against stand-ins · ✅
+- **Why:** the function can't run on Supabase until you've set it up there, and Vitest only covers its logic, not how it uses web-push and supabase-js.
+- **Where:** Deno 2.9.5 on the Mac. The real `supabase/functions/daily-reminder/index.ts` runs with its own `deno.json`, as Supabase would run it.
+- **How:** a script does the following.
+  1. It runs `scripts/notification-keys.mjs` and gives the function the keys and token it prints.
+  2. It points the function at two stand-ins:
+     - a fake database API (PostgREST) that only answers callers with the secret key, sent in `SUPABASE_SECRET_KEYS`. Its `claim_due_reminders` returns three devices: one the push service accepts, one it answers 410 (gone), and one it answers 429 (busy).
+     - a fake HTTPS push service that verifies each push's VAPID signature and decrypts the push with the device's private key.
+  3. It calls the function with a wrong token, then with the right one.
+- **Result:**
+  - The script prints one public key for both the app and the function, and its Vault lines use the function's address and the same token.
+  - A wrong token gets **403**.
+  - The real call gets `{"due":3,"sent":1,"gone":1,"failed":1}`.
+  - The accepted push decrypts to "You have 3 tasks for 2 projects today, plus 1 overdue". Its signature verifies, its `sub` is the live site's address, and it has `TTL: 21600`, `Urgency: normal` and `Topic: daily-reminder`.
+  - `forget_push_subscriptions` gets exactly the gone device's address.
+  - The function's log says "A push was refused (429)." and never prints a device's address.
+- **Test-only setup:** the fake push service's certificate is self-signed, so the function's process was given `NODE_EXTRA_CA_CERTS` and `--allow-sys=ca`. Supabase's real push services have ordinary certificates.
+
+### T-26 · The scheduled job's SQL, against stand-ins for pg_net and Vault · ✅
+- **Why:** `npm run test:db` skips scheduling the job, because a plain Postgres has neither pg_cron nor pg_net. So the job's SQL, which runs every minute on Supabase, isn't covered there.
+- **Where:** a throwaway local Postgres 17, with the shim and every migration loaded.
+- **How:** a script stands in for `net.http_post` (same signature as pg_net's: `url`, `body`, `params`, `headers`, `timeout_milliseconds`), recording each call, and for `vault.decrypted_secrets`, holding a made-up address and token. It runs the job's SQL, copied out of the migration, twice: with no device due, then with one device whose time is the current minute.
+- **Result:**
+  - The migration reports "pg_cron or pg_net is missing, so the daily reminder job is not scheduled." and carries on.
+  - With no device due, the job makes **no** call.
+  - With one due, it makes exactly one: to the address from Vault, with headers `Content-Type: application/json` and `x-reminder-token` from Vault, body `{}`, and a 30-second timeout.
+
+### T-25 · `web-push` 3.6.7 under Deno · ✅
+- **Why:** Supabase's Edge Functions run on Deno, not Node, and `web-push` is a Node library. A push that encrypts or signs wrongly is still accepted by the push service, but the phone drops it without a sign.
+- **Where:** Deno 2.9.5 on the Mac.
+- **How:** a script imports `npm:web-push@3.6.7` and makes a push for a made-up subscription. The subscription's keys come from the Web Crypto API, the way a browser makes them. The script then checks the request the way a browser and Apple would: it verifies the VAPID signature with the public key, then decrypts the body (RFC 8291, `aes128gcm`) with the subscription's private key.
+- **Result:**
+  - The request has `Content-Encoding: aes128gcm` and `TTL: 21600`.
+  - The VAPID JWT verifies, with `aud` `https://web.push.apple.com` and `sub` the live site's address.
+  - The body decrypts to the exact payload: `{"title":"You have 3 tasks for 2 projects today, plus 1 overdue"}`.
+
+---
+
 ## Branch `cleanup-tasks`: clean-up tasks (2026-10-28)
 
 ### T-24 · Production after the clean-up migration, from outside · ✅ (what can be seen)
@@ -315,10 +436,13 @@ The scripts were throwaway and not committed; their steps are written out below.
   - The sidebar hint was first reported missing. Waiting for the data to load (about 25 ms after the button appears) showed it was a timing problem in the script; the hint is there.
   - No console errors.
 
-### T-02 · Database migration and access-rule tests on a local Postgres · ⏳ not run
-- **Why:** this Mac has the Postgres client tools but no Postgres server. Downloading a self-contained Postgres into the session's temporary folder was blocked by Claude Code's permission check.
-- **To run:** `brew install postgresql@17`, then `npm run test:db`.
-- T-04, T-07 and T-10 cover the same rules on the real dev project, except an account that exists but isn't on the allowlist.
+### T-02 · Database migration and access-rule tests on a local Postgres · ✅ (first run 2026-10-30, after a fix)
+- **Why it waited:** until 2026-10-30, this Mac had the Postgres client tools but no Postgres server. Downloading a self-contained Postgres into the session's temporary folder was blocked by Claude Code's permission check.
+- **Setup:** `brew install postgresql@17`. Homebrew's post-install step didn't run the first time, so Postgres couldn't find its own files (`initdb: file ".../share/postgresql@17/postgres.bki" does not exist`). Running `brew postinstall postgresql@17` fixed it.
+- **First run:** ❌ The first 20 checks passed, then "Bob cannot update Alice's project" stopped the run: `WITH clause containing a data-modifying statement must be at the top level`. The check had put its `update` in a subquery. So that check and the ones after it had never run, though the migrations themselves loaded fine.
+- **Fix:** on the `notifications` branch, the check runs its `update` at the top level and checks the result. `run-local.sh` now also finds Homebrew's Postgres 17 without `PG_BIN`.
+- **Result:** ✅ all 68 checks pass: the 36 from before, plus 32 daily-reminder checks added on that branch.
+- T-04, T-07 and T-10 cover the same rules on the real dev project, except an account that exists but isn't on the allowlist. Here, that's Carol.
 
 ### T-01 · The app signed out, after the local database gained new tables · ✅
 - **Where:** the dev server with no Supabase settings, in headless Chromium on desktop.

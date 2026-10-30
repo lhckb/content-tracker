@@ -3,6 +3,7 @@ import {
   addDaysISO,
   daysInRange,
   daysBetween,
+  formatClock,
   formatDateRange,
   isISODate,
   isPlausibleDate,
@@ -53,6 +54,13 @@ describe('dates', () => {
     expect(formatDateRange('2026-11-14')).toBe('Nov 14')
     expect(formatDateRange('2026-11-05', '2026-11-06')).toBe('Nov 5–6')
     expect(formatDateRange('2026-10-30', '2026-11-02')).toBe('Oct 30 – Nov 2')
+  })
+
+  it('formats a time of day', () => {
+    expect(formatClock('08:00')).toBe('8:00 AM')
+    expect(formatClock('00:05')).toBe('12:05 AM')
+    expect(formatClock('12:00')).toBe('12:00 PM')
+    expect(formatClock('18:30')).toBe('6:30 PM')
   })
 
   it('skips the half-typed years a date input reports along the way', () => {

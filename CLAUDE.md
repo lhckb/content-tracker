@@ -49,7 +49,7 @@ The full spec is in @SPEC.md and is the source of truth. Read it before writing 
 
 ## Out of scope for the MVP
 
-Do not build any of these: Instagram or YouTube API integration, notifications, file attachments, time-of-day scheduling, or recurring projects. (Sign-in and sync came after the MVP; see below.)
+Do not build any of these: Instagram or YouTube API integration, file attachments, time-of-day scheduling, or recurring projects. (Sign-in and sync, and a daily reminder notification, came after the MVP; see below.)
 
 ## Sign-in and sync (added after the MVP)
 
@@ -65,7 +65,7 @@ The plan and its decisions are in `docs/plans/supabase-sync.md`.
 
   Never weaken one to make another work.
 - **Database changes are SQL migrations** in `supabase/migrations/`, reviewed in a PR. `npm run test:db` checks the access rules against a local Postgres. Run a new migration in the dev project while building, and in production **before** merging the app change that needs it. Keep migrations compatible with the app version already live (e.g. a new `sync_push` argument gets a default).
-- **Keys:** the app only ever uses the publishable key. The service-role key never goes in the app, the repo or `.env.local`.
+- **Keys:** the app only ever uses the publishable key. The service-role key never goes in the app, the repo or `.env.local`; the daily-reminder function uses Supabase's own copy, inside Supabase.
 - **Configuration:** builds without `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` (see `.env.example`) run signed-out only.
 
 ## Ideas (added after the MVP)
@@ -95,6 +95,27 @@ The plan and its decisions are in `docs/plans/cleanup-tasks.md`.
   - Ticking Publish offers to archive only when no clean-up task is open. Otherwise ticking the last clean-up task makes the offer (`setDone` in `src/components/actions.ts`).
 - **Backups** are format version 3. Versions 1 and 2 still import.
 
+## Notifications (added after the MVP)
+
+The plan, its decisions and the setup for each Supabase project are in `docs/plans/notifications.md`.
+
+- **A daily reminder per device.**
+  - It says "You have 3 tasks for 2 projects today, plus 1 overdue", or "You have 2 overdue tasks" when nothing is due today. On a day with nothing at all, no reminder is sent.
+  - Each device sets its own time of day, in the Notifications card of the ⋯ menu.
+  - It needs you signed in. On the iPhone it only works in the Home Screen app.
+- **The server sends it.**
+  - `push_subscriptions` has one row per device. It's the one table that isn't in Dexie and isn't synced, and it isn't written with `writing()`: `src/data/notifications.ts` writes it straight to Supabase.
+  - Every minute, a pg_cron job checks `reminders_due()`. When something is due, it calls the `daily-reminder` Edge Function in `supabase/functions/daily-reminder`.
+  - The function claims the due devices with `claim_due_reminders()`, which does the counting in SQL, and sends the pushes with web-push.
+- **Keys:**
+  - The VAPID private key and the reminder token are in each project's function secrets. The token is also in Vault, for the job.
+  - `VITE_VAPID_PUBLIC_KEY` is a public build variable. A build without it has no reminders.
+  - `scripts/notification-keys.mjs` makes all three.
+- **`public/sw.js`** only shows pushes: it has no fetch handler and caches nothing. Keep it that way unless offline use is planned on purpose.
+- **Testing:**
+  - The function's logic is in `reminders.ts`, which Vitest tests.
+  - Push needs HTTPS or localhost, so `npm run dev:phone` can't test it. The iPhone is tested on the live site.
+
 ## Phone layout (added after the MVP)
 
 Below 768px wide (`PHONE_QUERY` in `src/hooks/useMediaQuery.ts`, Tailwind `max-md:`), the sidebar becomes a Projects tab in a bottom tab bar (Calendar · Projects · Ideas), cards open as full-screen sheets, and the calendar switches to `PhoneMonth`/`PhoneWeek` in `src/components/calendar/PhoneCalendar.tsx`. Touch drags start with press-and-hold. The desktop layout is unchanged, so check both widths when changing UI. The app is meant to be added to the iPhone Home Screen from Safari.
@@ -107,6 +128,7 @@ Below 768px wide (`PHONE_QUERY` in `src/hooks/useMediaQuery.ts`, Tailwind `max-m
 - `npm run typecheck`: TypeScript only (`tsc -b`)
 - `npm test`: Vitest, once; `npm run test:watch` to rerun on save. Tests run in `America/Los_Angeles` so UTC date-parsing bugs fail, and use fake-indexeddb, so data-layer tests need no browser.
 - `npm run lint`: Oxlint
-- `npm run test:db`: applies `supabase/migrations` to a throwaway local Postgres and runs the access-rule tests (needs a Postgres server, e.g. `brew install postgresql@17`, or `PG_BIN`)
+- `npm run test:db`: applies `supabase/migrations` to a throwaway local Postgres and runs the access-rule tests (needs a Postgres server: Homebrew's `postgresql@17` is found on its own, or set `PG_BIN`)
+- `deno check --config supabase/functions/daily-reminder/deno.json supabase/functions/daily-reminder/index.ts`: type-checks the daily-reminder Edge Function, which `tsc -b` doesn't cover
 - Pull requests: `.github/workflows/ci.yml` runs the tests, lint and build on every PR. Branch protection on `main` requires that check ("Tests, lint and build") to pass before merging.
 - Deploy: push to `main`. `.github/workflows/deploy.yml` runs the tests, lint and build, then publishes `dist/` to https://lhckb.github.io/content-tracker/. The build uses relative asset paths (`base: './'`), so it works under that sub-path.
