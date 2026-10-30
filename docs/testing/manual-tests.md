@@ -21,6 +21,23 @@ The scripts were throwaway and not committed; their steps are written out below.
 
 ## Branch `notifications`: daily reminders (2026-10-30)
 
+### T-31 · Production after its notifications setup · ✅
+- **Setup, run by you** from the repo root with the Supabase and GitHub CLIs. Claude Code's safety check blocked me from changing production, so I prepared the commands:
+  1. The migration, wrapped in one transaction, through `supabase db query --linked`.
+  2. A one-off script that ran `scripts/notification-keys.mjs` for production and handed the keys straight to `supabase secrets set` and to Vault, without printing the private key or the token. It also set the GitHub variable `VITE_VAPID_PUBLIC_KEY` to production's public key. Before that, the variable held **dev's** key, which would have made push services refuse every reminder on the live site.
+  3. `supabase functions deploy daily-reminder --no-verify-jwt`.
+- **Checks, read-only:**
+
+  | Check | Result |
+  | --- | --- |
+  | Database, through `supabase db query` | `push_subscriptions` exists with 0 devices. pg_cron 1.6.4 and pg_net 0.20.4 are on. The `daily-reminder` job runs every minute (`* * * * *`, active), and its last runs succeeded (19:44, 19:45). Vault has `daily_reminder_url` and `daily_reminder_token`. `reminders_due()` is false. |
+  | Function, through `supabase functions list` and `secrets list` | `daily-reminder` is active, with `verify_jwt` false. Its secrets include `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` and `REMINDER_TOKEN`. |
+  | The function from outside | No token: **403**. A wrong token: **403** "Forbidden". GET: **405**. |
+  | The API signed out, with the publishable key | Reading `push_subscriptions`, `claim_due_reminders` and `forget_push_subscriptions` all get **42501** (permission denied) |
+  | GitHub variable | It's now production's key, not dev's, and its SHA-256 equals the digest Supabase lists for the function's `VAPID_PUBLIC_KEY`. So the live build subscribes with the key the function signs with. |
+
+- **Not checked from outside:** a real reminder on production. That comes after the merge, on the iPhone's Home Screen app.
+
 ### T-30 · A real reminder on the dev project (done by you) · ✅ (as reported)
 - **Where:** your dev server on the Mac, against the dev project, after you set it up (migration, keys, function secrets, Vault, the function deployed with its JWT check off, `VITE_VAPID_PUBLIC_KEY` in `.env.local`).
 - **Result, as you reported it:** "it works on dev I just tested here locally." The browser and the exact steps weren't stated.
