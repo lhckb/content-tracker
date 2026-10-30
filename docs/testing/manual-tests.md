@@ -21,6 +21,24 @@ The scripts were throwaway and not committed; their steps are written out below.
 
 ## Branch `notifications`: daily reminders (2026-10-30)
 
+### T-27 · The daily-reminder function, run for real under Deno against stand-ins · ✅
+- **Why:** the function can't run on Supabase until you've set it up there, and Vitest only covers its logic, not how it uses web-push and supabase-js.
+- **Where:** Deno 2.9.5 on the Mac. The real `supabase/functions/daily-reminder/index.ts` runs with its own `deno.json`, as Supabase would run it.
+- **How:** a script does the following.
+  1. It runs `scripts/notification-keys.mjs` and gives the function the keys and token it prints.
+  2. It points the function at two stand-ins:
+     - a fake database API (PostgREST) that only answers callers with the secret key, sent in `SUPABASE_SECRET_KEYS`. Its `claim_due_reminders` returns three devices: one the push service accepts, one it answers 410 (gone), and one it answers 429 (busy).
+     - a fake HTTPS push service that verifies each push's VAPID signature and decrypts the push with the device's private key.
+  3. It calls the function with a wrong token, then with the right one.
+- **Result:**
+  - The script prints one public key for both the app and the function, and its Vault lines use the function's address and the same token.
+  - A wrong token gets **403**.
+  - The real call gets `{"due":3,"sent":1,"gone":1,"failed":1}`.
+  - The accepted push decrypts to "You have 3 tasks for 2 projects today, plus 1 overdue". Its signature verifies, its `sub` is the live site's address, and it has `TTL: 21600`, `Urgency: normal` and `Topic: daily-reminder`.
+  - `forget_push_subscriptions` gets exactly the gone device's address.
+  - The function's log says "A push was refused (429)." and never prints a device's address.
+- **Test-only setup:** the fake push service's certificate is self-signed, so the function's process was given `NODE_EXTRA_CA_CERTS` and `--allow-sys=ca`. Supabase's real push services have ordinary certificates.
+
 ### T-26 · The scheduled job's SQL, against stand-ins for pg_net and Vault · ✅
 - **Why:** `npm run test:db` skips scheduling the job, because a plain Postgres has neither pg_cron nor pg_net. So the job's SQL, which runs every minute on Supabase, isn't covered there.
 - **Where:** a throwaway local Postgres 17, with the shim and every migration loaded.
