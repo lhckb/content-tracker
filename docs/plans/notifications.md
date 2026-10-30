@@ -179,7 +179,7 @@ Do this in dev first, then in production before merging. Each project gets its o
 3. **Set the function secrets:** in Edge Functions, Secrets, paste `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` and `REMINDER_TOKEN`.
 4. **Set the Vault secrets:** run the two `vault.create_secret` lines in the SQL Editor.
 5. **Deploy the function** from `supabase/functions/daily-reminder` with its JWT check **off**, so the job's calls aren't refused before the function can check the token. Either way:
-   - with the CLI: `supabase functions deploy daily-reminder --project-ref <project-ref> --no-verify-jwt`;
+   - with the CLI, from the repo root (not from inside `supabase/`, where it can't find the function): `supabase functions deploy daily-reminder --project-ref <project-ref> --no-verify-jwt`. The warning that Docker isn't running is fine; the CLI then bundles on Supabase's side;
    - in the dashboard: Edge Functions, Deploy a new function, Via editor. Name it `daily-reminder`, add `index.ts`, `reminders.ts` and `deno.json`, then turn off its JWT verification in the function's settings.
 6. **The app:**
    - Dev: add `VITE_VAPID_PUBLIC_KEY` to `.env.local` and restart `npm run dev`.
