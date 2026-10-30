@@ -1,10 +1,13 @@
 # Plan: Notifications
 
-Status: building · 2026-10-30. You answered A–D and chose the recommendation for N. You handle the Supabase side.
+Status: built and in review · 2026-10-30. You answered A–D and chose the recommendation for N.
 
-Nothing is built yet, but two checks have run:
-- `web-push` passed a check under Deno.
-- Postgres 17 is installed, and `npm run test:db` ran for the first time (T-02). It found a bug in the existing test file: one check put an `update` inside a subquery, which Postgres refuses, so the checks after it never ran. With that check rewritten, every check passes. The fix is part of step 1.
+You handle the Supabase side, following "Setting up a Supabase project" below:
+1. You set up dev.
+2. I run the dev checks.
+3. You set up production, before merging.
+
+The checks so far are T-02 and T-25 to T-28 in `docs/testing/manual-tests.md`.
 
 ## Goal
 
@@ -111,13 +114,13 @@ A new migration, `supabase/migrations/<timestamp>_notifications.sql`.
   In the same statement, it marks them as sent for that date. So two runs at the same time can't send twice, and a late run still sends. It returns the push address, the keys and the three counts, for the devices with a task today or one overdue.
 - **`reminders_due()`** is the job's cheap check: it's true when some device's time has come.
 - **`forget_push_subscriptions(endpoints)`** removes addresses the push service says no longer exist.
-- All three are `security definer`. Only the server's secret key (the `service_role`) and the scheduled job can run them; app users and anonymous callers can't.
+- All three are `security definer`, and app users and anonymous callers can't run them. The server function runs the claim and the forget with the secret key (the `service_role`). The scheduled job runs `reminders_due()` as the database owner.
 
 **The schedule:**
 
 - The migration turns on `pg_cron` and `pg_net`, then schedules the every-minute job.
 - The local Postgres used by `npm run test:db` doesn't have those extensions, so there the migration skips this part.
-- The job reads the function's address and a reminder token from Supabase Vault. So the migration holds no secrets and is the same for dev and production.
+- The job reads the function's address and a reminder token from Supabase Vault, as `daily_reminder_url` and `daily_reminder_token`. So the migration holds no secrets and is the same for dev and production.
 
 **Compatible with the live app:** nothing the live app uses changes.
 
@@ -145,11 +148,11 @@ A new migration, `supabase/migrations/<timestamp>_notifications.sql`.
 
 - **It refuses any call without the reminder token,** which comes in a header. The new Supabase keys aren't JWTs, so Supabase's own check (`verify_jwt`) has to be off for a scheduled call, and the function checks the token itself. Someone holding the token could only start a run, and a run only sends reminders that are due, at most once a day.
 - **It reads the database with the secret key Supabase gives every function** (`SUPABASE_SECRET_KEYS`), only through the functions above.
-- **It sends with `web-push` 3.6.7,** which handles the encryption and signing (VAPID). The version is pinned in the function's `deno.json`. Each push expires after 6 hours, so a reminder the phone couldn't receive in the morning doesn't arrive at night.
+- **It sends with `web-push` 3.6.7,** which handles the encryption and signing (VAPID). The function's `deno.json` pins it and supabase-js 2.118.0, and `deno.lock` records exactly what was fetched. Its type definitions (`@types/web-push`) are used for type checks only. Each push expires after 6 hours, so a reminder the phone couldn't receive in the morning doesn't arrive at night.
 - **It reads three secrets:** `VAPID_PRIVATE_KEY`, `VAPID_PUBLIC_KEY` and `REMINDER_TOKEN`.
 - **Push services ask for a contact address** (the VAPID subject). The function gives the live site's address, so no email address is sent to Apple or Google.
 - **The sentence** comes from `reminderText({ tasks, projects, overdue })`, in a plain `message.ts` next to the function. Vitest tests it along with the other tests.
-- **Type checks:** `tsc -b` only covers `src/`, so I check the function with `deno check`. Deno is already installed on the Mac.
+- **Type checks:** `tsc -b` only covers `src/`, so the function is checked with `deno check --config supabase/functions/daily-reminder/deno.json supabase/functions/daily-reminder/index.ts`. Deno is already installed on the Mac.
 
 ### Keys
 
@@ -161,6 +164,33 @@ A new migration, `supabase/migrations/<timestamp>_notifications.sql`.
 | Secret key (`service_role`) | only Supabase's own environment for functions | no |
 
 A script, `scripts/notification-keys.mjs`, prints a fresh VAPID key pair and a token, and where each goes. It uses Node's own crypto, with no dependency. You run it once per project, so the private values pass only through your terminal and the Supabase dashboard.
+
+## Setting up a Supabase project
+
+Do this in dev first, then in production before merging. Each project gets its own keys and token.
+
+1. **Run the migration,** `supabase/migrations/20261030120000_notifications.sql`, in the SQL Editor.
+   - It also turns on pg_cron and pg_net and schedules the `daily-reminder` job.
+   - Integrations, Cron should then list `daily-reminder`, running every minute.
+2. **Make the keys:** run `node scripts/notification-keys.mjs https://<project-ref>.supabase.co`. It prints:
+   - `VITE_VAPID_PUBLIC_KEY`, for the app;
+   - three function secrets;
+   - two Vault lines.
+3. **Set the function secrets:** in Edge Functions, Secrets, paste `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` and `REMINDER_TOKEN`.
+4. **Set the Vault secrets:** run the two `vault.create_secret` lines in the SQL Editor.
+5. **Deploy the function** from `supabase/functions/daily-reminder` with its JWT check **off**, so the job's calls aren't refused before the function can check the token. Either way:
+   - with the CLI: `supabase functions deploy daily-reminder --project-ref <project-ref> --no-verify-jwt`;
+   - in the dashboard: Edge Functions, Deploy a new function, Via editor. Name it `daily-reminder`, add `index.ts`, `reminders.ts` and `deno.json`, then turn off its JWT verification in the function's settings.
+6. **The app:**
+   - Dev: add `VITE_VAPID_PUBLIC_KEY` to `.env.local` and restart `npm run dev`.
+   - Production: add a repository variable `VITE_VAPID_PUBLIC_KEY` (Settings, Secrets and variables, Actions, Variables).
+7. **Check it** in the SQL Editor:
+   - `select public.reminders_due();` returns `false` while no device is due.
+   - `select status, return_message from cron.job_run_details order by start_time desc limit 3;` shows the job succeeding every minute.
+
+**Replacing a value later:**
+- A Vault secret: `select vault.update_secret((select id from vault.secrets where name = 'daily_reminder_token'), '<new token>');`. The token must match the `REMINDER_TOKEN` function secret.
+- New VAPID keys end every device's subscription, because push services tie each subscription to the public key. Turn reminders off and on again on each device.
 
 ## The four locks
 
@@ -189,7 +219,7 @@ This doesn't depend on the welcome guide. Both add an item to the ⋯ menu, so w
 - setting the function's three secrets;
 - deploying the function with its JWT check off.
 
-I'll give you the exact values to set and the script that makes the keys. Deploying is up to you: the Supabase CLI or the dashboard's editor.
+The exact steps are under "Setting up a Supabase project" below.
 
 1. **Database:**
    - first, the fix to the existing test that T-02 found, and `run-local.sh` finding Homebrew's Postgres 17 without `PG_BIN`;
@@ -276,3 +306,5 @@ A: "You have 2 overdue tasks."
 - **K.** A push expires after 6 hours.
 - **L.** The contact address for push services is the live site's address, not an email address.
 - **M.** Dev and production each get their own keys and token.
+- **O.** Changing the time starts the day afresh: if today's reminder has already gone out, it comes again at the new time.
+- **P.** Turning on always makes a fresh push subscription, because an old one may be an address the push service has dropped.

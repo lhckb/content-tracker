@@ -32,11 +32,14 @@ jobs:
       - run: npm run lint
       - run: npm run build
         env:
-          # The Supabase project for sign-in and sync. Public by design (see
-          # src/data/supabase.ts); set as repository variables. Without
-          # them the site runs signed-out only.
+          # The Supabase project for sign-in and sync, and the public key
+          # for daily reminders. Public by design (see src/data/supabase.ts
+          # and src/data/notifications.ts); set as repository variables.
+          # Without the first two the site runs signed-out only; without
+          # the third, it has no reminders.
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          VITE_VAPID_PUBLIC_KEY: ${{ vars.VITE_VAPID_PUBLIC_KEY }}
       - uses: actions/upload-pages-artifact@v5
         with:
           path: dist
