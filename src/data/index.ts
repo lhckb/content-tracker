@@ -36,6 +36,7 @@ export {
   type NotificationStatus,
   type ReminderTime,
 } from './notifications'
+export { googleDocs, GoogleDocsError, type GoogleDocs } from './googleDocs'
 export {
   backupFileName,
   BackupError,

@@ -1,6 +1,7 @@
 import type { User } from '@supabase/supabase-js'
 import { useSyncExternalStore } from 'react'
 import { deleteAccountSpace, switchSpace } from './db'
+import { googleDocs } from './googleDocs'
 import { refreshNotifications, turnOffNotifications } from './notifications'
 import { openedAt, supabase, supabaseServer } from './supabase'
 import { countPendingChanges, startSync, type SyncEngine } from './sync'
@@ -56,6 +57,7 @@ function follow(user: User | null): void {
     // any unsent changes, for the next sign-in.
     engine?.stop()
     engine = null
+    googleDocs?.forget()
     switchSpace({ kind: 'guest' })
     setAccount({ state: 'signed-out' })
     return
@@ -99,6 +101,7 @@ export async function signOut({ discardUnsynced = false } = {}): Promise<SignOut
   await turnOffNotifications()
   engine?.stop()
   engine = null
+  googleDocs?.forget()
   await supabase.auth.signOut()
   await deleteAccountSpace(userId)
   setAccount({ state: 'signed-out' })
