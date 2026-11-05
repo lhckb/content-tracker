@@ -32,14 +32,17 @@ jobs:
       - run: npm run lint
       - run: npm run build
         env:
-          # The Supabase project for sign-in and sync, and the public key
-          # for daily reminders. Public by design (see src/data/supabase.ts
-          # and src/data/notifications.ts); set as repository variables.
-          # Without the first two the site runs signed-out only; without
-          # the third, it has no reminders.
+          # The Supabase project for sign-in and sync, the public key for
+          # daily reminders, and the Google client for the Google Doc
+          # button. Public by design (see src/data/supabase.ts,
+          # src/data/notifications.ts and src/data/googleDocs.ts); set as
+          # repository variables. Without the first two the site runs
+          # signed-out only; without the third, it has no reminders;
+          # without the fourth, no Google Doc button.
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
           VITE_VAPID_PUBLIC_KEY: ${{ vars.VITE_VAPID_PUBLIC_KEY }}
+          VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
       - uses: actions/upload-pages-artifact@v5
         with:
           path: dist

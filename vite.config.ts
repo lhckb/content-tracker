@@ -24,11 +24,12 @@ export default defineConfig({
       // West of UTC, where parsing 'YYYY-MM-DD' as UTC midnight lands on the
       // previous day, so that mistake fails the tests.
       TZ: 'America/Los_Angeles',
-      // A build without Supabase or reminders, as in CI, whatever .env.local
-      // holds on this machine.
+      // A build without Supabase, reminders or Google Docs, as in CI,
+      // whatever .env.local holds on this machine.
       VITE_SUPABASE_URL: '',
       VITE_SUPABASE_PUBLISHABLE_KEY: '',
       VITE_VAPID_PUBLIC_KEY: '',
+      VITE_GOOGLE_CLIENT_ID: '',
     },
   },
 })
