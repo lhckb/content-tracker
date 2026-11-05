@@ -3,7 +3,7 @@
 Status: built on branch `google-docs`, steps 1–5, 2026-11-05. You answered A–E and chose the recommendation each time. F–L were my defaults, accepted with the go-ahead. The migration has run on dev (T-34), and the button works end to end with Google faked (T-37).
 
 Still to do:
-1. You: "Setting up Google Cloud" below, then send me the client ID.
+1. You: steps 1–3 of "Setting up Google Cloud" below. The client ID needs nothing from you: it's the one Google sign-in already uses, the same for dev and production, and it's now in `.env.local`.
 2. The check with your real Google account on localhost (T-38).
 3. You run the migration on production; I check it from outside (T-39).
 4. You set the GitHub variable and merge; then the live site and the iPhone (T-40).
@@ -85,8 +85,8 @@ You do this once, in the Google Cloud project used for sign-in:
 1. **APIs & Services → Library:** enable the **Google Drive API**.
 2. **Google Auth Platform → Data access → Add or remove scopes:** add `…/auth/drive.file` and save. It's a non-sensitive scope, so Testing mode is enough.
 3. **Clients → the Web client → Authorized JavaScript origins:** check that `https://lhckb.github.io` and `http://localhost:5173` are there.
-4. **Send me the client ID** (it ends in `.apps.googleusercontent.com`). It's public by design. If dev and production use different clients, send both.
-5. **GitHub:** run `gh variable set VITE_GOOGLE_CLIENT_ID --body "<production client ID>"`.
+4. **The client ID:** nothing to do. It's the client Supabase already uses for Google sign-in, in both projects. I read it from their public sign-in redirect to Google, and it's in `.env.local`. It's public by design.
+5. **GitHub:** run `gh variable set VITE_GOOGLE_CLIENT_ID --body "913587664475-5fttvl4hkq1oab003cg6f1u6q4dhquvq.apps.googleusercontent.com"`.
 
 ## The four locks
 
