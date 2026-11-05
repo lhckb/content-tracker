@@ -1,14 +1,16 @@
-import { useEffect, useState } from 'react'
-import { googleDocs, GoogleDocsError, useAccount } from '../../data'
+import { useRef, useState } from 'react'
+import { googleDocs, GoogleDocsError, GoogleDocsReplaced, useAccount, type DocPhase } from '../../data'
 import { docUrl } from '../../lib/googleDocs'
 import { ask } from '../ask'
 
 const BUTTON =
   'inline-flex items-center gap-1.5 rounded-md border border-stone-300 bg-white px-2.5 py-1 text-xs font-medium hover:bg-stone-50 disabled:cursor-wait disabled:opacity-60 max-md:py-1.5 max-md:text-sm'
 
-// Create Google Doc → Creating… → Open Google Doc, beside a project's
-// Notes or an idea's Description (docs/plans/google-docs.md). Hidden when
-// signed out, or when the build has no Google client ID.
+// Create Google Doc → (Waiting for Google…) → Creating… → Open Google Doc,
+// beside a project's Notes or an idea's Description
+// (docs/plans/google-docs.md). The click opens a tab that goes to Google
+// when needed and ends on the new doc. Hidden when signed out, or when the
+// build has no Google client ID.
 export function GoogleDocButton({
   kind,
   id,
@@ -21,14 +23,10 @@ export function GoogleDocButton({
   onNotice: (message: string) => void
 }) {
   const account = useAccount()
-  const [busy, setBusy] = useState(false)
-  const signedIn = account.state === 'signed-in'
-
-  // Google's script loads with the card, not at startup, so it's ready by
-  // the click: a window opened long after a click gets blocked.
-  useEffect(() => {
-    if (signedIn) googleDocs?.preload()
-  }, [signedIn])
+  const [phase, setPhase] = useState<DocPhase | null>(null)
+  // Only the latest click updates the button; an earlier one it replaced
+  // just stops.
+  const click = useRef(0)
 
   if (!googleDocs || account.state !== 'signed-in') return null
   const docs = googleDocs
@@ -43,28 +41,41 @@ export function GoogleDocButton({
       )
       if (!sure) return
     }
-    // With a token in hand Google's window won't open, so the doc's tab
-    // can open now, while the click still allows it. Otherwise Google's
-    // window uses up the click, and the button's link opens the doc.
-    const tab = docs.hasToken(email) ? openWaitingTab() : null
-    setBusy(true)
+    const mine = ++click.current
+    const update = (next: DocPhase | null) => {
+      if (click.current === mine) setPhase(next)
+    }
     try {
-      const made = kind === 'project' ? await docs.createProjectDoc(id, email) : await docs.createIdeaDoc(id, email)
-      if (tab && !tab.closed) tab.location.replace(docUrl(made))
-      else onNotice(`Made the Google Doc in the "Content Tracker" folder of your Drive.`)
+      // Nothing is awaited between the click and this call.
+      const outcome = await docs.makeDoc({ kind, id }, email, update)
+      if (outcome === 'made') onNotice('Made the Google Doc in the "Content Tracker" folder of your Drive.')
     } catch (error) {
-      tab?.close()
+      if (error instanceof GoogleDocsReplaced) return
       onNotice(
         error instanceof GoogleDocsError
           ? error.message
           : `The Google Doc wasn't made: ${error instanceof Error ? error.message : String(error)}`,
       )
     } finally {
-      setBusy(false)
+      update(null)
     }
   }
 
-  if (docId && !busy) {
+  if (phase === 'google') {
+    // Still clickable: if the Google tab was closed, this starts again.
+    return (
+      <button
+        type="button"
+        title="Finish in the Google tab, or click to start again"
+        onClick={() => void create(false)}
+        className={BUTTON}
+      >
+        <DocIcon />
+        Waiting for Google…
+      </button>
+    )
+  }
+  if (docId && !phase) {
     return (
       <span className="flex items-center gap-3">
         <button
@@ -82,32 +93,11 @@ export function GoogleDocButton({
     )
   }
   return (
-    <button type="button" disabled={busy} onClick={() => void create(false)} className={BUTTON}>
+    <button type="button" disabled={phase === 'creating'} onClick={() => void create(false)} className={BUTTON}>
       <DocIcon />
-      {busy ? 'Creating…' : 'Create Google Doc'}
+      {phase === 'creating' ? 'Creating…' : 'Create Google Doc'}
     </button>
   )
-}
-
-// A blank tab that the new doc then loads into. Not in the iPhone's Home
-// Screen app, where a new tab leaves the app; there the link is the way in.
-function openWaitingTab(): Window | null {
-  const standalone =
-    window.matchMedia?.('(display-mode: standalone)').matches ||
-    (navigator as Navigator & { standalone?: boolean }).standalone === true
-  if (standalone) return null
-  const tab = window.open('', '_blank')
-  if (!tab) return null
-  try {
-    tab.document.title = 'Google Doc'
-    tab.document.body.style.cssText = 'font: 15px system-ui, sans-serif; color: #57534e; padding: 2rem'
-    tab.document.body.textContent = 'Making the Google Doc…'
-  } catch {
-    // Only a nicety; the doc still loads into it.
-  }
-  // The doc's page shouldn't be able to reach back into the app.
-  tab.opener = null
-  return tab
 }
 
 function DocIcon() {

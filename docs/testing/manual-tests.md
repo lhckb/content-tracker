@@ -21,17 +21,56 @@ The scripts were throwaway and not committed; their steps are written out below.
 
 ## Branch `google-docs`: a Google Doc from a project or an idea (2026-11-05)
 
+### T-42 · A real Google account against the dev project, after the rework (done by you) · ⏳
+- **Where:** `npm run dev` on http://localhost:5173, against the dev project, once `http://localhost:5173/google-callback.html` is an Authorized redirect URI (setup step 3).
+- **What to check:**
+  - **The first click:** a tab opens on Google's consent. It should name only "the specific Google Drive files you use with this app". After Allow, that tab ends on the new doc.
+  - **In Drive:** the folder, and the doc's name and text, including accents, emoji and line breaks.
+  - **Afterwards:** Open Google Doc, Make a new copy (a tab opens straight on the new doc), an empty-notes doc, and the link appearing in a second browser.
+
+### T-41 · The reworked flow end to end, desktop and the Home Screen app, with Google faked · ✅
+- **Where:** the dev server on 5181 against the dev project, built with a made-up `VITE_GOOGLE_CLIENT_ID` and reminders off (T-36). Playwright's WebKit only (T-35): 1440×900, and an iPhone 15 with `navigator.standalone` set to true to stand in for the Home Screen app. A and B are signed in as the test user; C is signed out.
+- **How:** Playwright answers Google's OAuth page with a stand-in:
+  - **Consent mode:** shows Allow and Cancel; Allow sends the tab back with a token, as Google does.
+  - **Pass mode:** sends the tab straight back with a token, as Google does once allowed.
+  - **Deny mode:** sends it back with `error=access_denied`.
+
+  A fake Drive answers `www.googleapis.com`, and `docs.google.com` gets a placeholder. Anything other than localhost and the dev Supabase host is blocked.
+- **Result:** 24 of 24 checks pass:
+
+  | Step | Result |
+  | --- | --- |
+  | Before any click | No request to Google |
+  | A: Create Google Doc | A new tab opens at once, on Google's consent. It asks for `drive.file` and a token, hints the test user's email, and comes back to `http://localhost:5181/google-callback.html` with a random state. The button reads **Waiting for Google…** |
+  | Allow, in that tab | The same tab goes straight on and ends on `doc-1`. The button reads **Open Google Doc** for it. The upload carries the title, the folder and the notes as typed, with Google's token. The token never shows in the app's address |
+  | Make a new copy (token in hand) | The new tab opens straight on `doc-2`, with no trip to Google |
+  | Make a new copy, offline | The tab says "No Google Doc was made. Couldn't reach Google Drive…", and so does a toast. The link is unchanged |
+  | After a reload, refused at Google | The tab and a toast say access wasn't allowed. The link is unchanged |
+  | B: same account | Shows the same doc |
+  | An idea, Google passing straight through | The tab ends on `doc-3`, which holds the description. **Make project** carries it over |
+  | Phone, Home Screen app: Make a new copy | No new tab: the app itself goes to Google. After Allow it comes back to a clean address, makes `doc-4`, and reopens the card with **Open Google Doc** and the notice "Made the Google Doc…". No sideways scroll |
+  | `google-callback.html` opened by hand | Says it's part of Content Tracker's Google Docs |
+  | C: signed out | No button, and nothing asks Google |
+
+- No page errors; no request left the allowed hosts. Both test projects were deleted, and the test account has 0 live rows. The "Waiting for Google…" state and the phone's return were checked by eye in screenshots.
+
 ### T-40 · The live site on desktop and in the iPhone's Home Screen app · ⏳
-- **Where:** https://lhckb.github.io/content-tracker/, after the merge, signed in with your Google account.
-- **What to check:** Create Google Doc on a project and on an idea (Google's window, then the doc in the "Content Tracker" folder), Open Google Doc, Make a new copy, and the link on the other device. On the iPhone this is the plan's main risk: whether Google's window works inside the Home Screen app.
+- **Where:** https://lhckb.github.io/content-tracker/, after the merge, signed in with your Google account, once `https://lhckb.github.io/content-tracker/google-callback.html` is an Authorized redirect URI.
+- **What to check:** Create Google Doc on a project and on an idea (the tab to Google and on to the doc), Open Google Doc, Make a new copy, and the link on the other device. On the iPhone, the Home Screen app's round trip to Google and back.
 
 ### T-39 · Production after the Google Docs migration, from outside · ⏳
 - **Where:** the production project's public API, with the publishable key only and signed out, after you run the migration there (before merging).
 - **What to check:** as in T-24, that `sync_push` still answers both the three-list and the live app's two-list call with `42501` (it exists, and refuses anyone signed out). The new column itself can't be seen from outside; your first doc on the live site confirms it.
 
-### T-38 · A real Google account against the dev project (done by you) · ⏳
-- **Where:** `npm run dev` on http://localhost:5173, against the dev project, once the Google Cloud setup is done and the client ID is in `.env.local`.
-- **What to check:** the first consent (it should name only "the specific Google Drive files you use with this app"), the folder and the doc's name and text in Drive (accents, emoji and line breaks), Open Google Doc, Make a new copy, an empty-notes doc, and the link appearing in a second browser.
+### T-38 · The first try with your real Google account (reported by you) · ❌, then reworked
+- **Where:** `npm run dev` on http://localhost:5173 against the dev project, with sign-in's Google client in `.env.local`. This was the first version, which used Google's script and its popup.
+- **What you saw:**
+  1. The first click: Google's window asked for Drive access, you allowed it, the window closed, and nothing happened.
+  2. The next click made the doc, but you then had to click **Open Google Doc**, instead of the doc opening in a new tab.
+- **Why:**
+  - (2) is how browsers work: a click may open only one window, and Google's popup used it up, so the app wasn't allowed to open the doc's tab afterwards.
+  - (1) is the popup handing its answer back to the page, which didn't arrive after the first consent. Most likely that's Safari and Google's popup not getting along, but it wasn't pinned down: the console wasn't captured.
+- **Done:** Google's script and popup are gone. The click opens a tab that goes to Google itself and, once allowed, carries on to make the doc and becomes it (T-41). Check again with your account: T-42.
 
 ### T-37 · The Google Doc button end to end, desktop and phone, with Google faked · ✅
 - **Where:** the dev server on 5181 against the dev project, built with a made-up `VITE_GOOGLE_CLIENT_ID` and with reminders off (see T-36). Playwright's WebKit only (see T-35): 1440×900 for desktop, an iPhone 15 for the phone. Contexts A and B are signed in as the test user; C is signed out.
