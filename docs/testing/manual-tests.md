@@ -59,9 +59,22 @@ The scripts were throwaway and not committed; their steps are written out below.
 - **Where:** https://lhckb.github.io/content-tracker/, after the merge, signed in with your Google account, once `https://lhckb.github.io/content-tracker/google-callback.html` is an Authorized redirect URI.
 - **What to check:** Create Google Doc on a project and on an idea (the tab to Google and on to the doc), Open Google Doc, Make a new copy, and the link on the other device. On the iPhone, the Home Screen app's round trip to Google and back.
 
-### T-39 · Production after the Google Docs migration, from outside · ⏳
-- **Where:** the production project's public API, with the publishable key only and signed out, after you run the migration there (before merging).
-- **What to check:** as in T-24, that `sync_push` still answers both the three-list and the live app's two-list call with `42501` (it exists, and refuses anyone signed out). The new column itself can't be seen from outside; your first doc on the live site confirms it.
+### T-39 · Production after the Google Docs migration · ✅
+- **Where:** the production project, after you ran the migration there (2026-11-05, before merging).
+- **From outside**, with the publishable key only and signed out:
+
+  | Request | Result |
+  | --- | --- |
+  | `projects?select=doc_id`, `ideas?select=doc_id` | `42501` permission denied. The column exists, and signed-out reads are refused |
+  | Control: `projects?select=no_such_column` | `42703` "does not exist", so the `42501` above does show the column is there |
+  | `sync_push` with three lists, and with the live app's two | Both `42501`: the function exists, keeps its signature, and refuses anyone signed out |
+  | Control: `sync_push` with a made-up argument | `PGRST202`, not found |
+
+- **Inside, read only**, through `supabase db query --linked --project-ref uwfyzskkiowvaugqcgrq`:
+  - `doc_id text` on `projects` and `ideas`, with `projects_doc_id_check` and `ideas_doc_id_check`;
+  - one `sync_push(jsonb, jsonb, jsonb)`, whose body keeps the stored doc for both tables (`coalesce(excluded.doc_id, …)`);
+  - the same grants as before (only `postgres` and `authenticated`);
+  - 0 projects with a doc yet.
 
 ### T-38 · The first try with your real Google account (reported by you) · ❌, then reworked
 - **Where:** `npm run dev` on http://localhost:5173 against the dev project, with sign-in's Google client in `.env.local`. This was the first version, which used Google's script and its popup.

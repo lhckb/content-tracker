@@ -4,10 +4,9 @@ Status: built on branch `google-docs`, steps 1–5, 2026-11-05, then reworked af
 
 Done since: Google Cloud is set up, including the two redirect addresses, and your real account works on localhost (T-42).
 
-Still to do:
-1. Push the branch and open the PR.
-2. You run the migration on production; I check it from outside (T-39).
-3. You set the GitHub variable and merge; then the live site and the iPhone (T-40).
+Also done: PR #8 (CI passes), the GitHub variable, and the production migration, checked as T-39.
+
+Still to do: you mark PR #8 ready and merge; then the live site and the iPhone (T-40).
 
 ## Changes while building
 
