@@ -22,6 +22,7 @@ import { ask } from '../ask'
 import { cx } from '../cx'
 import { ProgressBar } from '../ProgressBar'
 import { DateField } from './DateField'
+import { GoogleDocButton } from './GoogleDocButton'
 import { CloseButton } from './Modal'
 
 const BUTTON =
@@ -224,9 +225,12 @@ export function ProjectDetail({
         </section>
 
         <section className="flex flex-col">
-          <label htmlFor={`${id}-notes`} className="mb-2 text-sm font-semibold">
-            Notes
-          </label>
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+            <label htmlFor={`${id}-notes`} className="text-sm font-semibold">
+              Notes
+            </label>
+            <GoogleDocButton kind="project" id={project.id} docId={project.docId} onNotice={onNotice} />
+          </div>
           <textarea
             id={`${id}-notes`}
             {...notes}
