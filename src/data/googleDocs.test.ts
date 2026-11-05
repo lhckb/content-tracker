@@ -227,7 +227,7 @@ describe('making a doc in a new tab', () => {
 
     const page = openCallbackPage(googleAnswers(browser.tabs[0]))
     expect(page.cleared).toBe(true)
-    expect(page.shown).toEqual(['Making the Google Doc…'])
+    expect(page.shown).toEqual(['Creating Google Doc file…'])
     expect(await outcome).toBe('opened')
     expect(phases).toEqual(['google', 'creating'])
     await vi.waitFor(() => expect(page.went).toEqual(['https://docs.google.com/document/d/doc-1/edit']))

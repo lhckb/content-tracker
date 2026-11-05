@@ -134,7 +134,7 @@ export function runCallbackPage(page: CallbackPage): void {
     return
   }
 
-  page.show('Making the Google Doc…')
+  page.show('Creating Google Doc file…')
   let waited = 0
   let done = false
   let stop = () => {}

@@ -21,12 +21,13 @@ The scripts were throwaway and not committed; their steps are written out below.
 
 ## Branch `google-docs`: a Google Doc from a project or an idea (2026-11-05)
 
-### T-42 · A real Google account against the dev project, after the rework (done by you) · ⏳
-- **Where:** `npm run dev` on http://localhost:5173, against the dev project, once `http://localhost:5173/google-callback.html` is an Authorized redirect URI (setup step 3).
-- **What to check:**
-  - **The first click:** a tab opens on Google's consent. It should name only "the specific Google Drive files you use with this app". After Allow, that tab ends on the new doc.
-  - **In Drive:** the folder, and the doc's name and text, including accents, emoji and line breaks.
-  - **Afterwards:** Open Google Doc, Make a new copy (a tab opens straight on the new doc), an empty-notes doc, and the link appearing in a second browser.
+### T-42 · A real Google account against the dev project, after the rework (done by you) · ❌, then ✅ (as reported)
+- **Where:** `npm run dev` on http://localhost:5173, against the dev project.
+- **First try:** ❌ Google showed `redirect_uri_mismatch`. The callback addresses weren't yet among the OAuth client's Authorized redirect URIs: only Supabase's two were there.
+  - **Check:** I asked Google's OAuth page directly, signed out, for each address. A refused one is sent to `/signin/oauth/error`, whose `authError` decodes to `redirect_uri_mismatch`. An accepted one goes on to Google's sign-in. Supabase's callback, as the control, was accepted.
+  - **Fix:** you added `http://localhost:5173/google-callback.html` and `https://lhckb.github.io/content-tracker/google-callback.html`, keeping Supabase's two. Google accepted both straight away.
+- **Second try:** ✅ It worked. Your one request was the text the tab shows while it works: it read "Making the Google Doc…" and now reads "Creating Google Doc file…".
+- **Not reported:** the doc's text in Drive (accents, emoji, line breaks), and the link in a second browser. Vitest and T-41 cover both with Google faked.
 
 ### T-41 · The reworked flow end to end, desktop and the Home Screen app, with Google faked · ✅
 - **Where:** the dev server on 5181 against the dev project, built with a made-up `VITE_GOOGLE_CLIENT_ID` and reminders off (T-36). Playwright's WebKit only (T-35): 1440×900, and an iPhone 15 with `navigator.standalone` set to true to stand in for the Home Screen app. A and B are signed in as the test user; C is signed out.

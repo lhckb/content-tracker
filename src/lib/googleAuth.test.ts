@@ -73,7 +73,7 @@ describe('the callback page', () => {
   it('keeps waiting while the app is still working', () => {
     const opened = page('#state=s1')
     opened.answer({ type: 'status', state: 's1' })
-    expect(opened.shown).toEqual(['Making the Google Doc…'])
+    expect(opened.shown).toEqual(['Creating Google Doc file…'])
     opened.answer({ type: 'status', state: 's1', docId: 'doc-1' })
     expect(opened.went).toEqual(['https://docs.google.com/document/d/doc-1/edit'])
   })

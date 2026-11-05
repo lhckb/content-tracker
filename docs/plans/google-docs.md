@@ -2,11 +2,12 @@
 
 Status: built on branch `google-docs`, steps 1–5, 2026-11-05, then reworked after your first real try (T-38). You answered A–E and chose the recommendation each time. F–L were my defaults, accepted with the go-ahead. E is now superseded (see below). The migration has run on dev (T-34), and the reworked flow works end to end with Google faked (T-41).
 
+Done since: Google Cloud is set up, including the two redirect addresses, and your real account works on localhost (T-42).
+
 Still to do:
-1. You: steps 1–3 of "Setting up Google Cloud" below. Step 3 is new: two redirect addresses. The client ID needs nothing from you: it's the one Google sign-in already uses, the same for dev and production, and it's now in `.env.local`.
-2. The check with your real Google account on localhost, again (T-42).
-3. You run the migration on production; I check it from outside (T-39).
-4. You set the GitHub variable and merge; then the live site and the iPhone (T-40).
+1. Push the branch and open the PR.
+2. You run the migration on production; I check it from outside (T-39).
+3. You set the GitHub variable and merge; then the live site and the iPhone (T-40).
 
 ## Changes while building
 
