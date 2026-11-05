@@ -9,7 +9,7 @@ Every check that isn't part of `npm test`, whether done by hand or with a throwa
 - the live site, https://lhckb.github.io/content-tracker/.
 
 **Tools:**
-- Playwright driving headless Chromium or WebKit, emulating an iPhone 15 for phone checks;
+- Playwright driving headless WebKit, emulating an iPhone 15 for phone checks. Before T-35, also its Chromium, which is no longer used: see T-35;
 - Node scripts using `@supabase/supabase-js` with the **publishable key only**, signed in as the dev test user `test@content-tracker.dev`;
 - `curl`.
 
@@ -18,6 +18,71 @@ The scripts were throwaway and not committed; their steps are written out below.
 **Results:** ✅ pass · ❌ fail (with what was done about it) · ⏳ not run yet.
 
 ---
+
+## Branch `google-docs`: a Google Doc from a project or an idea (2026-11-05)
+
+### T-40 · The live site on desktop and in the iPhone's Home Screen app · ⏳
+- **Where:** https://lhckb.github.io/content-tracker/, after the merge, signed in with your Google account.
+- **What to check:** Create Google Doc on a project and on an idea (Google's window, then the doc in the "Content Tracker" folder), Open Google Doc, Make a new copy, and the link on the other device. On the iPhone this is the plan's main risk: whether Google's window works inside the Home Screen app.
+
+### T-39 · Production after the Google Docs migration, from outside · ⏳
+- **Where:** the production project's public API, with the publishable key only and signed out, after you run the migration there (before merging).
+- **What to check:** as in T-24, that `sync_push` still answers both the three-list and the live app's two-list call with `42501` (it exists, and refuses anyone signed out). The new column itself can't be seen from outside; your first doc on the live site confirms it.
+
+### T-38 · A real Google account against the dev project (done by you) · ⏳
+- **Where:** `npm run dev` on http://localhost:5173, against the dev project, once the Google Cloud setup is done and the client ID is in `.env.local`.
+- **What to check:** the first consent (it should name only "the specific Google Drive files you use with this app"), the folder and the doc's name and text in Drive (accents, emoji and line breaks), Open Google Doc, Make a new copy, an empty-notes doc, and the link appearing in a second browser.
+
+### T-37 · The Google Doc button end to end, desktop and phone, with Google faked · ✅
+- **Where:** the dev server on 5181 against the dev project, built with a made-up `VITE_GOOGLE_CLIENT_ID` and with reminders off (see T-36). Playwright's WebKit only (see T-35): 1440×900 for desktop, an iPhone 15 for the phone. Contexts A and B are signed in as the test user; C is signed out.
+- **How:** Playwright answers every request itself. Google's script (`accounts.google.com/gsi/client`) is a stand-in that records each token request and answers with a token after 300 ms, or with "window closed" on demand. A fake Drive answers `www.googleapis.com` and records each call. `docs.google.com` gets a placeholder page. Anything other than localhost and the dev Supabase host is blocked, so the browser only rendered the app.
+- **Result:** 22 of 22 checks pass:
+
+  | Step | Result |
+  | --- | --- |
+  | A: new project, type notes "Hook: café ☕️ at 5am / Shots: desk, window" | **Create Google Doc** on the right of the Notes heading |
+  | Click it | Reads **Creating…**; one token request, for `drive.file`, with the test user's email as the hint, `prompt: ''` and the build's client ID |
+  | Drive calls | Folder search, folder made, one multipart upload with the title, the folder and the notes exactly as typed, sent with the token |
+  | Afterwards | **Open Google Doc**, linking to `docs.google.com/document/d/doc-1/edit` in a new tab. Google's window was needed, so no tab opened; the notice says the doc was made in the "Content Tracker" folder |
+  | **Make a new copy** | Asks first; on yes, with the token in hand, a tab opens on the click and loads `doc-2`. The button now opens `doc-2`. No new token request, and the folder was reused |
+  | Make a new copy, offline | Notice "Couldn't reach Google Drive…"; the waiting tab closes; the link still opens `doc-2` |
+  | After a reload, Google's window closed | Notice "Google's window was closed, so no doc was made."; nothing changed |
+  | B: the same account in another browser | The project shows **Open Google Doc** for `doc-2` |
+  | An idea: description, then Create Google Doc | The doc is named after the idea and holds its description; **Make project** carries the doc over to the new project |
+  | Phone: the project sheet | The heading row fits: Notes, Make a new copy, Open Google Doc. No sideways scroll (393 px) |
+  | C: signed out | No Google Doc button, and Google's script never loads |
+
+- No page errors, and no request left the allowed hosts. The two test projects were deleted afterwards. Two earlier, aborted runs (script mistakes) had left two more, which a script then removed as tombstones, so the test account has 0 live rows.
+- Screenshots of both cards at both widths were checked by eye.
+
+### T-36 · Headless WebKit freezes after sign-in when reminders are configured (found while testing) · ❌, not fixed
+- **Where:** Playwright's WebKit 27.2, the dev server against the dev project, with `VITE_VAPID_PUBLIC_KEY` set as in `.env.local`.
+- **What happened:** a few seconds after signing in as the test user, the page stops responding: no new frames, and `page.evaluate` never returns. It happens with no request blocking at all, and on `main` too (a worktree on port 5180), so this branch didn't cause it. With `VITE_VAPID_PUBLIC_KEY` empty it doesn't happen.
+- **Likely cause:** the reminder code that runs right after sign-in (`refreshNotifications`) calls `navigator.serviceWorker.getRegistration()` and `pushManager.getSubscription()`. It has no loops of its own, so WebKit is probably hanging inside one of those calls, in this headless build. Not seen in your Safari or on the iPhone so far.
+- **Done:** T-37 ran with reminders off. Worth a look if the app ever freezes after sign-in in real Safari.
+
+### T-35 · The browser used for automated checks: Playwright's Chromium has known security holes (asked by you) · ❌, so it wasn't used
+- **What you asked:** to verify that this Playwright doesn't ship a Chromium with known CVEs.
+- **Checked:** `playwright@1.64.1` (npm's `latest`, Oct 14) ships Chrome for Testing **156.0.8078.4** (its `browsers.json`, and `playwright install --dry-run`). That's an early build from before Chrome 156's security releases: 156.0.8078.47 on Oct 20 and 156.0.8078.73 on Oct 27. The second fixed four critical bugs (CVE-2026-118306, -118331, -118344, -118348). Reports this week say the same, and Playwright runs its Chromium with the sandbox off by default. The 1.65 beta and 1.66 alpha ship a pre-release 158.0.8127.18. No Google Chrome is installed on the Mac, so `channel: 'chrome'` isn't an option.
+- **Done:** the downloaded Chromium and its headless shell were deleted from the scratchpad. The checks used only Playwright's WebKit, with every request other than localhost and the dev Supabase host faked or blocked.
+
+### T-34 · The Google Docs migration on the dev project · ✅
+- **Where:** the dev project. The migration ran through `supabase db query --linked --project-ref ldfzwpxcckxqywmdqnnx`, wrapped in one transaction. Then a Node script ran as the test user, with the publishable key only.
+- **First, locally:** `npm run test:db` caught a mistake before dev saw it: the id check was first written `{1,256}`, which Postgres refuses (its limit is 255) only when the check first runs. It's now `{1,200}` in the migration and the app. Then all checks pass, including the new ones: a doc is stored; an edit without `doc_id` or with null keeps it; a new copy replaces it; an older edit doesn't bring an older doc back; a non-Drive id or an empty one is refused.
+- **Result on dev:**
+
+  | Check | Result |
+  | --- | --- |
+  | Columns | `doc_id text` on `projects` and `ideas`, with `projects_doc_id_check` and `ideas_doc_id_check` |
+  | `sync_push` | One function, `sync_push(jsonb, jsonb, jsonb)`, with the new body and the same grants (only `postgres` and `authenticated`) |
+  | Push a project with a doc, as the test user | Stored |
+  | An edit without `doc_id` (as the live app sends), then one with null | The doc stays |
+  | A new copy | Replaces it |
+  | `doc_id` "https://example.com/x" | Refused, `23514` |
+  | The live app's two-list call | Still works |
+  | An idea with a doc, then an edit without it | The doc stays |
+
+  Everything was then pushed as tombstones: 0 live rows in the test account.
 
 ## Branch `notifications`: daily reminders (2026-10-30)
 

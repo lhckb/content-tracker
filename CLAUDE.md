@@ -116,6 +116,24 @@ The plan, its decisions and the setup for each Supabase project are in `docs/pla
   - The function's logic is in `reminders.ts`, which Vitest tests.
   - Push needs HTTPS or localhost, so `npm run dev:phone` can't test it. The iPhone is tested on the live site.
 
+## Google Docs (added after the MVP)
+
+The plan and its decisions are in `docs/plans/google-docs.md`.
+
+- **A button** on the right of a project's Notes heading and an idea's Description heading: Create Google Doc → Creating… → Open Google Doc, plus a small "Make a new copy". It shows only when signed in, in builds with `VITE_GOOGLE_CLIENT_ID` (the OAuth client ID; public).
+- **A one-time copy:** the doc is named after the project or idea and holds its notes as plain text, in a "Content Tracker" folder in Drive. After that the notes and the doc are separate.
+- **Data:**
+  - `docId` (a Drive file id) on `Project` and `Idea`, set with `setProjectDoc`/`setIdeaDoc` through `writing()`, synced as `doc_id`.
+  - The link is built from it (`docUrl` in `src/lib/googleDocs.ts`), never stored. The id is checked in the app, in backups and in the database.
+  - `sync_push` keeps the stored `doc_id` when a row comes without one, so an older app can't wipe it. The app never clears a link, only replaces it.
+  - Make project carries the idea's doc over.
+- **Google:** `src/data/googleDocs.ts` gets a `drive.file` token from Google's sign-in script and calls the Drive API with plain `fetch`.
+  - The script loads when a card with the button opens, not at startup.
+  - The token is kept in memory only, and it's not Supabase's Google token, which runs out after an hour and is never refreshed.
+  - In a click, request the token before awaiting anything else, or the browser blocks Google's window.
+- **Backups** are format version 4. Versions 1–3 still import.
+- **Testing:** Vitest fakes Google's script and Drive (`googleDocs.test.ts`). Google refuses plain-HTTP addresses other than localhost, so `npm run dev:phone` can't test it.
+
 ## Phone layout (added after the MVP)
 
 Below 768px wide (`PHONE_QUERY` in `src/hooks/useMediaQuery.ts`, Tailwind `max-md:`), the sidebar becomes a Projects tab in a bottom tab bar (Calendar · Projects · Ideas), cards open as full-screen sheets, and the calendar switches to `PhoneMonth`/`PhoneWeek` in `src/components/calendar/PhoneCalendar.tsx`. Touch drags start with press-and-hold. The desktop layout is unchanged, so check both widths when changing UI. The app is meant to be added to the iPhone Home Screen from Safari.

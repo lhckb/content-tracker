@@ -1,6 +1,19 @@
 # Plan: Google Docs
 
-Status: planned, waiting for your go-ahead · 2026-11-03. You answered A–E and chose the recommendation each time; F–L are my defaults.
+Status: built on branch `google-docs`, steps 1–5, 2026-11-05. You answered A–E and chose the recommendation each time. F–L were my defaults, accepted with the go-ahead. The migration has run on dev (T-34), and the button works end to end with Google faked (T-37).
+
+Still to do:
+1. You: "Setting up Google Cloud" below, then send me the client ID.
+2. The check with your real Google account on localhost (T-38).
+3. You run the migration on production; I check it from outside (T-39).
+4. You set the GitHub variable and merge; then the live site and the iPhone (T-40).
+
+## Changes while building
+
+- **Google's script loads when a card with the button opens,** not on the first click. Still not at startup. Loading it on the click would often get Google's window blocked, since browsers block windows opened long after a click.
+- **The doc opens in a new tab on the click only when no Google window is needed** (a token is in hand). Google's window uses up the click, so then a notice says the doc was made, and the button opens it. In the iPhone's Home Screen app the button is always the way in, since a new tab would leave the app.
+- **The doc id is checked** to look like a Drive file id (letters, digits, `-` and `_`, up to 200) in the app, in backups and in the database. A damaged backup or row can't become a link somewhere else.
+- **Make a new copy asks:** "Make a new Google Doc from the notes as they are now? The button will open the new doc. The current one stays in your Drive."
 
 ## Goal
 
