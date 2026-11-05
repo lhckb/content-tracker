@@ -11,6 +11,8 @@ import { ask } from './components/ask'
 import { TopBar } from './components/TopBar'
 import {
   answerGuestCopyOffer,
+  googleDocs,
+  GoogleDocsError,
   guestCopyOffer,
   startupSignInError,
   useAccount,
@@ -35,6 +37,7 @@ function App() {
   const dismissNotice = useCallback(() => setNotice(''), [])
   const account = useAccount()
   const signedInAs = account.state === 'signed-in' ? account.userId : null
+  const email = account.state === 'signed-in' ? account.email : null
 
   // Just signed in on a device with projects or ideas made while signed out:
   // offer, once, to add them to the account.
@@ -57,6 +60,24 @@ function App() {
       current = false
     }
   }, [signedInAs])
+  // Back in the Home Screen app from Google, which it left for to make a
+  // Google Doc: make it, and show the card it's for.
+  useEffect(() => {
+    if (!signedInAs || email === null || !googleDocs) return
+    googleDocs.resume(email).then(
+      (back) => {
+        if (!back) return
+        setPanel(back.target)
+        setNotice('Made the Google Doc in the "Content Tracker" folder of your Drive.')
+      },
+      (error: unknown) =>
+        setNotice(
+          error instanceof GoogleDocsError
+            ? error.message
+            : `The Google Doc wasn't made: ${error instanceof Error ? error.message : String(error)}`,
+        ),
+    )
+  }, [signedInAs, email])
   const openProject = useCallback((id: string) => setPanel({ kind: 'project', id }), [])
   const openSubtask = useCallback((id: string) => setPanel({ kind: 'subtask', id }), [])
   const openIdea = useCallback((id: string) => setPanel({ kind: 'idea', id }), [])

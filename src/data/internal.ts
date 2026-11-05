@@ -1,3 +1,4 @@
+import { isDocId } from '../lib/googleDocs'
 import type { ColorId, ISODate, Project, Subtask } from '../types'
 import { db } from './db'
 import { newId } from './ids'
@@ -49,4 +50,8 @@ export async function activeColors(exceptProjectId?: string): Promise<ColorId[]>
     .filter((p) => !p.archived && p.id !== exceptProjectId)
     .toArray()
   return active.map((p) => p.color)
+}
+
+export function assertDocId(docId: string): void {
+  if (!isDocId(docId)) throw new Error(`Not a Google Doc id: ${docId}`)
 }

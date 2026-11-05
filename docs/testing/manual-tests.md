@@ -9,7 +9,7 @@ Every check that isn't part of `npm test`, whether done by hand or with a throwa
 - the live site, https://lhckb.github.io/content-tracker/.
 
 **Tools:**
-- Playwright driving headless Chromium or WebKit, emulating an iPhone 15 for phone checks;
+- Playwright driving headless WebKit, emulating an iPhone 15 for phone checks. Before T-35, also its Chromium, which is no longer used: see T-35;
 - Node scripts using `@supabase/supabase-js` with the **publishable key only**, signed in as the dev test user `test@content-tracker.dev`;
 - `curl`.
 
@@ -18,6 +18,124 @@ The scripts were throwaway and not committed; their steps are written out below.
 **Results:** ✅ pass · ❌ fail (with what was done about it) · ⏳ not run yet.
 
 ---
+
+## Branch `google-docs`: a Google Doc from a project or an idea (2026-11-05)
+
+### T-42 · A real Google account against the dev project, after the rework (done by you) · ❌, then ✅ (as reported)
+- **Where:** `npm run dev` on http://localhost:5173, against the dev project.
+- **First try:** ❌ Google showed `redirect_uri_mismatch`. The callback addresses weren't yet among the OAuth client's Authorized redirect URIs: only Supabase's two were there.
+  - **Check:** I asked Google's OAuth page directly, signed out, for each address. A refused one is sent to `/signin/oauth/error`, whose `authError` decodes to `redirect_uri_mismatch`. An accepted one goes on to Google's sign-in. Supabase's callback, as the control, was accepted.
+  - **Fix:** you added `http://localhost:5173/google-callback.html` and `https://lhckb.github.io/content-tracker/google-callback.html`, keeping Supabase's two. Google accepted both straight away.
+- **Second try:** ✅ It worked. Your one request was the text the tab shows while it works: it read "Making the Google Doc…" and now reads "Creating Google Doc file…".
+- **Not reported:** the doc's text in Drive (accents, emoji, line breaks), and the link in a second browser. Vitest and T-41 cover both with Google faked.
+
+### T-41 · The reworked flow end to end, desktop and the Home Screen app, with Google faked · ✅
+- **Where:** the dev server on 5181 against the dev project, built with a made-up `VITE_GOOGLE_CLIENT_ID` and reminders off (T-36). Playwright's WebKit only (T-35): 1440×900, and an iPhone 15 with `navigator.standalone` set to true to stand in for the Home Screen app. A and B are signed in as the test user; C is signed out.
+- **How:** Playwright answers Google's OAuth page with a stand-in:
+  - **Consent mode:** shows Allow and Cancel; Allow sends the tab back with a token, as Google does.
+  - **Pass mode:** sends the tab straight back with a token, as Google does once allowed.
+  - **Deny mode:** sends it back with `error=access_denied`.
+
+  A fake Drive answers `www.googleapis.com`, and `docs.google.com` gets a placeholder. Anything other than localhost and the dev Supabase host is blocked.
+- **Result:** 24 of 24 checks pass:
+
+  | Step | Result |
+  | --- | --- |
+  | Before any click | No request to Google |
+  | A: Create Google Doc | A new tab opens at once, on Google's consent. It asks for `drive.file` and a token, hints the test user's email, and comes back to `http://localhost:5181/google-callback.html` with a random state. The button reads **Waiting for Google…** |
+  | Allow, in that tab | The same tab goes straight on and ends on `doc-1`. The button reads **Open Google Doc** for it. The upload carries the title, the folder and the notes as typed, with Google's token. The token never shows in the app's address |
+  | Make a new copy (token in hand) | The new tab opens straight on `doc-2`, with no trip to Google |
+  | Make a new copy, offline | The tab says "No Google Doc was made. Couldn't reach Google Drive…", and so does a toast. The link is unchanged |
+  | After a reload, refused at Google | The tab and a toast say access wasn't allowed. The link is unchanged |
+  | B: same account | Shows the same doc |
+  | An idea, Google passing straight through | The tab ends on `doc-3`, which holds the description. **Make project** carries it over |
+  | Phone, Home Screen app: Make a new copy | No new tab: the app itself goes to Google. After Allow it comes back to a clean address, makes `doc-4`, and reopens the card with **Open Google Doc** and the notice "Made the Google Doc…". No sideways scroll |
+  | `google-callback.html` opened by hand | Says it's part of Content Tracker's Google Docs |
+  | C: signed out | No button, and nothing asks Google |
+
+- No page errors; no request left the allowed hosts. Both test projects were deleted, and the test account has 0 live rows. The "Waiting for Google…" state and the phone's return were checked by eye in screenshots.
+
+### T-40 · The live site on desktop and in the iPhone's Home Screen app · ⏳
+- **Where:** https://lhckb.github.io/content-tracker/, after the merge, signed in with your Google account, once `https://lhckb.github.io/content-tracker/google-callback.html` is an Authorized redirect URI.
+- **What to check:** Create Google Doc on a project and on an idea (the tab to Google and on to the doc), Open Google Doc, Make a new copy, and the link on the other device. On the iPhone, the Home Screen app's round trip to Google and back.
+
+### T-39 · Production after the Google Docs migration · ✅
+- **Where:** the production project, after you ran the migration there (2026-11-05, before merging).
+- **From outside**, with the publishable key only and signed out:
+
+  | Request | Result |
+  | --- | --- |
+  | `projects?select=doc_id`, `ideas?select=doc_id` | `42501` permission denied. The column exists, and signed-out reads are refused |
+  | Control: `projects?select=no_such_column` | `42703` "does not exist", so the `42501` above does show the column is there |
+  | `sync_push` with three lists, and with the live app's two | Both `42501`: the function exists, keeps its signature, and refuses anyone signed out |
+  | Control: `sync_push` with a made-up argument | `PGRST202`, not found |
+
+- **Inside, read only**, through `supabase db query --linked --project-ref uwfyzskkiowvaugqcgrq`:
+  - `doc_id text` on `projects` and `ideas`, with `projects_doc_id_check` and `ideas_doc_id_check`;
+  - one `sync_push(jsonb, jsonb, jsonb)`, whose body keeps the stored doc for both tables (`coalesce(excluded.doc_id, …)`);
+  - the same grants as before (only `postgres` and `authenticated`);
+  - 0 projects with a doc yet.
+
+### T-38 · The first try with your real Google account (reported by you) · ❌, then reworked
+- **Where:** `npm run dev` on http://localhost:5173 against the dev project, with sign-in's Google client in `.env.local`. This was the first version, which used Google's script and its popup.
+- **What you saw:**
+  1. The first click: Google's window asked for Drive access, you allowed it, the window closed, and nothing happened.
+  2. The next click made the doc, but you then had to click **Open Google Doc**, instead of the doc opening in a new tab.
+- **Why:**
+  - (2) is how browsers work: a click may open only one window, and Google's popup used it up, so the app wasn't allowed to open the doc's tab afterwards.
+  - (1) is the popup handing its answer back to the page, which didn't arrive after the first consent. Most likely that's Safari and Google's popup not getting along, but it wasn't pinned down: the console wasn't captured.
+- **Done:** Google's script and popup are gone. The click opens a tab that goes to Google itself and, once allowed, carries on to make the doc and becomes it (T-41). Check again with your account: T-42.
+
+### T-37 · The Google Doc button end to end, desktop and phone, with Google faked · ✅
+- **Where:** the dev server on 5181 against the dev project, built with a made-up `VITE_GOOGLE_CLIENT_ID` and with reminders off (see T-36). Playwright's WebKit only (see T-35): 1440×900 for desktop, an iPhone 15 for the phone. Contexts A and B are signed in as the test user; C is signed out.
+- **How:** Playwright answers every request itself. Google's script (`accounts.google.com/gsi/client`) is a stand-in that records each token request and answers with a token after 300 ms, or with "window closed" on demand. A fake Drive answers `www.googleapis.com` and records each call. `docs.google.com` gets a placeholder page. Anything other than localhost and the dev Supabase host is blocked, so the browser only rendered the app.
+- **Result:** 22 of 22 checks pass:
+
+  | Step | Result |
+  | --- | --- |
+  | A: new project, type notes "Hook: café ☕️ at 5am / Shots: desk, window" | **Create Google Doc** on the right of the Notes heading |
+  | Click it | Reads **Creating…**; one token request, for `drive.file`, with the test user's email as the hint, `prompt: ''` and the build's client ID |
+  | Drive calls | Folder search, folder made, one multipart upload with the title, the folder and the notes exactly as typed, sent with the token |
+  | Afterwards | **Open Google Doc**, linking to `docs.google.com/document/d/doc-1/edit` in a new tab. Google's window was needed, so no tab opened; the notice says the doc was made in the "Content Tracker" folder |
+  | **Make a new copy** | Asks first; on yes, with the token in hand, a tab opens on the click and loads `doc-2`. The button now opens `doc-2`. No new token request, and the folder was reused |
+  | Make a new copy, offline | Notice "Couldn't reach Google Drive…"; the waiting tab closes; the link still opens `doc-2` |
+  | After a reload, Google's window closed | Notice "Google's window was closed, so no doc was made."; nothing changed |
+  | B: the same account in another browser | The project shows **Open Google Doc** for `doc-2` |
+  | An idea: description, then Create Google Doc | The doc is named after the idea and holds its description; **Make project** carries the doc over to the new project |
+  | Phone: the project sheet | The heading row fits: Notes, Make a new copy, Open Google Doc. No sideways scroll (393 px) |
+  | C: signed out | No Google Doc button, and Google's script never loads |
+
+- No page errors, and no request left the allowed hosts. The two test projects were deleted afterwards. Two earlier, aborted runs (script mistakes) had left two more, which a script then removed as tombstones, so the test account has 0 live rows.
+- Screenshots of both cards at both widths were checked by eye.
+
+### T-36 · Headless WebKit freezes after sign-in when reminders are configured (found while testing) · ❌, not fixed
+- **Where:** Playwright's WebKit 27.2, the dev server against the dev project, with `VITE_VAPID_PUBLIC_KEY` set as in `.env.local`.
+- **What happened:** a few seconds after signing in as the test user, the page stops responding: no new frames, and `page.evaluate` never returns. It happens with no request blocking at all, and on `main` too (a worktree on port 5180), so this branch didn't cause it. With `VITE_VAPID_PUBLIC_KEY` empty it doesn't happen.
+- **Likely cause:** the reminder code that runs right after sign-in (`refreshNotifications`) calls `navigator.serviceWorker.getRegistration()` and `pushManager.getSubscription()`. It has no loops of its own, so WebKit is probably hanging inside one of those calls, in this headless build. Not seen in your Safari or on the iPhone so far.
+- **Done:** T-37 ran with reminders off. Worth a look if the app ever freezes after sign-in in real Safari.
+
+### T-35 · The browser used for automated checks: Playwright's Chromium has known security holes (asked by you) · ❌, so it wasn't used
+- **What you asked:** to verify that this Playwright doesn't ship a Chromium with known CVEs.
+- **Checked:** `playwright@1.64.1` (npm's `latest`, Oct 14) ships Chrome for Testing **156.0.8078.4** (its `browsers.json`, and `playwright install --dry-run`). That's an early build from before Chrome 156's security releases: 156.0.8078.47 on Oct 20 and 156.0.8078.73 on Oct 27. The second fixed four critical bugs (CVE-2026-118306, -118331, -118344, -118348). Reports this week say the same, and Playwright runs its Chromium with the sandbox off by default. The 1.65 beta and 1.66 alpha ship a pre-release 158.0.8127.18. No Google Chrome is installed on the Mac, so `channel: 'chrome'` isn't an option.
+- **Done:** the downloaded Chromium and its headless shell were deleted from the scratchpad. The checks used only Playwright's WebKit, with every request other than localhost and the dev Supabase host faked or blocked.
+
+### T-34 · The Google Docs migration on the dev project · ✅
+- **Where:** the dev project. The migration ran through `supabase db query --linked --project-ref ldfzwpxcckxqywmdqnnx`, wrapped in one transaction. Then a Node script ran as the test user, with the publishable key only.
+- **First, locally:** `npm run test:db` caught a mistake before dev saw it: the id check was first written `{1,256}`, which Postgres refuses (its limit is 255) only when the check first runs. It's now `{1,200}` in the migration and the app. Then all checks pass, including the new ones: a doc is stored; an edit without `doc_id` or with null keeps it; a new copy replaces it; an older edit doesn't bring an older doc back; a non-Drive id or an empty one is refused.
+- **Result on dev:**
+
+  | Check | Result |
+  | --- | --- |
+  | Columns | `doc_id text` on `projects` and `ideas`, with `projects_doc_id_check` and `ideas_doc_id_check` |
+  | `sync_push` | One function, `sync_push(jsonb, jsonb, jsonb)`, with the new body and the same grants (only `postgres` and `authenticated`) |
+  | Push a project with a doc, as the test user | Stored |
+  | An edit without `doc_id` (as the live app sends), then one with null | The doc stays |
+  | A new copy | Replaces it |
+  | `doc_id` "https://example.com/x" | Refused, `23514` |
+  | The live app's two-list call | Still works |
+  | An idea with a doc, then an edit without it | The doc stays |
+
+  Everything was then pushed as tombstones: 0 live rows in the test account.
 
 ## Branch `notifications`: daily reminders (2026-10-30)
 

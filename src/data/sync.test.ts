@@ -10,6 +10,8 @@ import {
   getSubtasks,
   makeProjectFromIdea,
   setCleanup,
+  setIdeaDoc,
+  setProjectDoc,
   updateIdea,
   updateProject,
 } from '.'
@@ -38,6 +40,7 @@ function serverProject(id: string, fields: Partial<ProjectRow>): ProjectRow {
     publish_date: '2026-11-20',
     notes: '',
     archived: false,
+    doc_id: null,
     deleted: false,
     edited_at: '2026-10-27T13:00:00.000Z',
     ...fields,
@@ -52,6 +55,7 @@ function serverIdea(id: string, fields: Partial<IdeaRow>): IdeaRow {
     description: '',
     month: null,
     created_at: '2026-10-27T13:00:00.000Z',
+    doc_id: null,
     deleted: false,
     edited_at: '2026-10-27T13:00:00.000Z',
     ...fields,
@@ -248,6 +252,63 @@ describe('ideas', () => {
     expect(batches[0].projects.map((p) => p.id)).toEqual([projectId])
     expect(batches[0].subtasks).toHaveLength(6)
     expect(batches[0].ideas).toMatchObject([{ id: ideaId, deleted: true }])
+  })
+})
+
+describe('Google Docs', () => {
+  it('sends a project’s doc, and brings in one made on another device', async () => {
+    const id = await newProject()
+    await engine.syncNow()
+    expect(server.projects.get(id)?.doc_id).toBeNull()
+    await setProjectDoc(id, 'doc_from_here')
+    await engine.syncNow()
+    expect(server.projects.get(id)?.doc_id).toBe('doc_from_here')
+
+    // Another device makes a new copy.
+    const sent = server.projects.get(id)!
+    server.editFromAnotherDevice({
+      projects: [{ ...sent, doc_id: 'doc-from-there', edited_at: '2099-01-01T00:00:00.000Z' }],
+    })
+    await engine.syncNow()
+    expect((await getProject(id))?.docId).toBe('doc-from-there')
+  })
+
+  it('keeps the doc when a device without it edits the project', async () => {
+    const id = await newProject()
+    await setProjectDoc(id, 'the_doc')
+    await engine.syncNow()
+    // A device on the previous version sends no doc_id; one that hasn't
+    // pulled the doc yet sends null. Neither wipes it.
+    const { doc_id: _unused, ...withoutDoc } = server.projects.get(id)!
+    server.editFromAnotherDevice({
+      projects: [{ ...withoutDoc, title: 'Renamed elsewhere', edited_at: '2099-01-01T00:00:00.000Z' } as ProjectRow],
+    })
+    await engine.syncNow()
+    expect(await getProject(id)).toMatchObject({ title: 'Renamed elsewhere', docId: 'the_doc' })
+
+    await updateProject(id, { notes: 'Edited here' })
+    await engine.syncNow()
+    expect(server.projects.get(id)?.doc_id).toBe('the_doc')
+  })
+
+  it('sends an idea’s doc, and the project made from it keeps it', async () => {
+    const ideaId = await addIdea({ title: 'Studio tour', platform: 'youtube' })
+    await setIdeaDoc(ideaId, 'idea_doc')
+    await engine.syncNow()
+    expect(server.ideas.get(ideaId)?.doc_id).toBe('idea_doc')
+
+    const projectId = await makeProjectFromIdea(ideaId, {
+      title: 'Studio tour',
+      platform: 'youtube',
+      publishDate: '2027-03-20',
+      withDefaultSubtasks: false,
+    })
+    await engine.syncNow()
+    expect(server.projects.get(projectId)?.doc_id).toBe('idea_doc')
+
+    server.editFromAnotherDevice({ ideas: [serverIdea('i-remote', { doc_id: 'remote_idea_doc' })] })
+    await engine.syncNow()
+    expect((await getIdeas()).find((i) => i.id === 'i-remote')?.docId).toBe('remote_idea_doc')
   })
 })
 

@@ -76,6 +76,7 @@ export function Panels({
           today={today}
           onMakeProject={() => onNavigate({ kind: 'new-project', ideaId: idea.id })}
           onClose={close}
+          onNotice={onNotice}
         />
       </Modal>
     )

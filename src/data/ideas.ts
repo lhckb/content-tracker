@@ -2,6 +2,7 @@ import { assertISOMonth } from '../lib/ideas'
 import type { ISOMonth, Idea, Platform } from '../types'
 import { db, requestPersistentStorage, writing } from './db'
 import { newId } from './ids'
+import { assertDocId } from './internal'
 import { createProject, type NewProject } from './projects'
 
 export interface NewIdea {
@@ -35,21 +36,29 @@ export async function updateIdea(id: string, patch: IdeaPatch): Promise<void> {
   await writing(() => db.ideas.update(id, patch))
 }
 
+// Remembers the Google Doc made from the idea, replacing any earlier one
+// (whose doc stays in Drive).
+export async function setIdeaDoc(id: string, docId: string): Promise<void> {
+  assertDocId(docId)
+  await writing(() => db.ideas.update(id, { docId }))
+}
+
 export async function deleteIdea(id: string): Promise<void> {
   await writing(() => db.ideas.delete(id))
 }
 
 // Creates the project and removes the idea in one change, so sync can never
 // end up with both or neither. The idea's description becomes the project's
-// notes. Returns the new project's id.
+// notes, and its Google Doc, if any, the project's. Returns the new
+// project's id.
 export async function makeProjectFromIdea(
   ideaId: string,
-  input: Omit<NewProject, 'notes'>,
+  input: Omit<NewProject, 'notes' | 'docId'>,
 ): Promise<string> {
   return writing(async () => {
     const idea = await db.ideas.get(ideaId)
     if (!idea) throw new Error(`No idea with id ${ideaId}`)
-    const projectId = await createProject({ ...input, notes: idea.description })
+    const projectId = await createProject({ ...input, notes: idea.description, docId: idea.docId })
     await db.ideas.delete(ideaId)
     return projectId
   })

@@ -7,6 +7,7 @@ import type { ISODate, Idea } from '../../types'
 import { ask } from '../ask'
 import { cx } from '../cx'
 import { PlatformIcon } from '../PlatformIcon'
+import { GoogleDocButton } from './GoogleDocButton'
 import { CloseButton } from './Modal'
 
 export function IdeaCard({
@@ -14,11 +15,13 @@ export function IdeaCard({
   today,
   onMakeProject,
   onClose,
+  onNotice,
 }: {
   idea: Idea
   today: ISODate
   onMakeProject: () => void
   onClose: () => void
+  onNotice: (message: string) => void
 }) {
   const title = useAutosave(idea.title, (next) => void updateIdea(idea.id, { title: next.trim() }), {
     required: true,
@@ -114,9 +117,12 @@ export function IdeaCard({
       </div>
 
       <div className="flex flex-col gap-1">
-        <label htmlFor={`${id}-description`} className="text-sm text-stone-600">
-          Description
-        </label>
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+          <label htmlFor={`${id}-description`} className="text-sm text-stone-600">
+            Description
+          </label>
+          <GoogleDocButton kind="idea" id={idea.id} docId={idea.docId} onNotice={onNotice} />
+        </div>
         <textarea
           id={`${id}-description`}
           {...description}

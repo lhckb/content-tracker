@@ -37,6 +37,14 @@ export {
   type ReminderTime,
 } from './notifications'
 export {
+  googleDocs,
+  GoogleDocsError,
+  GoogleDocsReplaced,
+  type DocPhase,
+  type DocTarget,
+  type GoogleDocs,
+} from './googleDocs'
+export {
   backupFileName,
   BackupError,
   clearAllData,

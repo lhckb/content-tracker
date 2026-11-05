@@ -8,6 +8,7 @@ import { db, requestPersistentStorage, writing } from './db'
 import { newId } from './ids'
 import {
   activeColors,
+  assertDocId,
   newSubtask,
   requireProject,
   subtasksOf,
@@ -22,12 +23,15 @@ export interface NewProject {
   // The default clean-up tasks, the day after the publish date.
   withDefaultCleanup?: boolean
   notes?: string
+  // A Google Doc it starts with: an idea's, when made from one.
+  docId?: string
 }
 
 // Returns the new project's id. It always gets a Publish subtask, with or
 // without the default ones.
 export async function createProject(input: NewProject): Promise<string> {
   assertISODate(input.publishDate)
+  if (input.docId !== undefined) assertDocId(input.docId)
   // Now there's something worth keeping, ask the browser to hold on to it.
   void requestPersistentStorage()
   return writing(async () => {
@@ -39,6 +43,7 @@ export async function createProject(input: NewProject): Promise<string> {
       publishDate: input.publishDate,
       notes: input.notes ?? '',
       archived: false,
+      ...(input.docId ? { docId: input.docId } : {}),
     }
     const tasks = input.withDefaultSubtasks ? defaultTasks(input.publishDate) : []
     const cleanup = input.withDefaultCleanup ? defaultCleanupTasks(input.publishDate) : []
@@ -63,6 +68,13 @@ export type ProjectPatch = Partial<Pick<Project, 'title' | 'platform' | 'notes'>
 
 export async function updateProject(id: string, patch: ProjectPatch): Promise<void> {
   await writing(() => db.projects.update(id, patch))
+}
+
+// Remembers the Google Doc made from the project, replacing any earlier
+// one (whose doc stays in Drive).
+export async function setProjectDoc(id: string, docId: string): Promise<void> {
+  assertDocId(docId)
+  await writing(() => db.projects.update(id, { docId }))
 }
 
 export type SetColorResult = { ok: true } | { ok: false; reason: 'color-taken' }

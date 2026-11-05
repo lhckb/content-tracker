@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="robots" content="noindex" />
+    <title>Google Doc · Content Tracker</title>
+    <!-- Where Google sends a tab back with permission to make a Google Doc
+         (src/lib/googleAuth.ts). Kept apart from the app, so the app's
+         sign-in never sees Google's token in the address. -->
+    <style>
+      body {
+        margin: 0;
+        padding: 3rem 1.5rem;
+        background: #fafaf9;
+        color: #44403c;
+        font: 15px/1.5 system-ui, -apple-system, sans-serif;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <p id="message">Creating Google Doc file…</p>
+    <script type="module" src="/src/googleCallback.ts"></script>
+  </body>
+</html>

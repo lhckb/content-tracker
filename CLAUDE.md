@@ -116,6 +116,25 @@ The plan, its decisions and the setup for each Supabase project are in `docs/pla
   - The function's logic is in `reminders.ts`, which Vitest tests.
   - Push needs HTTPS or localhost, so `npm run dev:phone` can't test it. The iPhone is tested on the live site.
 
+## Google Docs (added after the MVP)
+
+The plan and its decisions are in `docs/plans/google-docs.md`.
+
+- **A button** on the right of a project's Notes heading and an idea's Description heading: Create Google Doc → Waiting for Google… → Creating… → Open Google Doc, plus a small "Make a new copy". It shows only when signed in, in builds with `VITE_GOOGLE_CLIENT_ID` (the OAuth client ID; public).
+- **A one-time copy:** the doc is named after the project or idea and holds its notes as plain text, in a "Content Tracker" folder in Drive. After that the notes and the doc are separate.
+- **Data:**
+  - `docId` (a Drive file id) on `Project` and `Idea`, set with `setProjectDoc`/`setIdeaDoc` through `writing()`, synced as `doc_id`.
+  - The link is built from it (`docUrl` in `src/lib/googleDocs.ts`), never stored. The id is checked in the app, in backups and in the database.
+  - `sync_push` keeps the stored `doc_id` when a row comes without one, so an older app can't wipe it. The app never clears a link, only replaces it.
+  - Make project carries the idea's doc over.
+- **Google:** no Google script. `src/data/googleDocs.ts` gets a `drive.file` access token by sending a tab to Google's OAuth page and back, then calls the Drive API with plain `fetch`.
+  - The click opens a new tab before anything is awaited (a click may open only one window). The tab goes to Google, comes back to `google-callback.html` (a second Vite entry, kept apart from the app so Supabase never sees Google's token), hands the token to the app over a `BroadcastChannel`, and becomes the doc. With a token in hand it skips Google. The protocol and the page's logic are in `src/lib/googleAuth.ts`.
+  - In the iPhone's Home Screen app, the app itself goes to Google and back (a new tab would leave the app), passing the request through `sessionStorage`. `App.tsx` calls `googleDocs.resume()` once signed in.
+  - The token is kept in memory only. It's not Supabase's Google token, which runs out after an hour and is never refreshed.
+  - Google only returns to addresses listed as Authorized redirect URIs on the OAuth client: `…/google-callback.html` on the live site and on localhost:5173.
+- **Backups** are format version 4. Versions 1–3 still import.
+- **Testing:** Vitest runs the app's side and the callback page against each other, with Google's answer and Drive faked (`googleDocs.test.ts`). Google refuses plain-HTTP addresses other than localhost, so `npm run dev:phone` can't test it.
+
 ## Phone layout (added after the MVP)
 
 Below 768px wide (`PHONE_QUERY` in `src/hooks/useMediaQuery.ts`, Tailwind `max-md:`), the sidebar becomes a Projects tab in a bottom tab bar (Calendar · Projects · Ideas), cards open as full-screen sheets, and the calendar switches to `PhoneMonth`/`PhoneWeek` in `src/components/calendar/PhoneCalendar.tsx`. Touch drags start with press-and-hold. The desktop layout is unchanged, so check both widths when changing UI. The app is meant to be added to the iPhone Home Screen from Safari.
