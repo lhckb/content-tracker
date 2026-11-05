@@ -12,6 +12,10 @@ export interface ProjectRow {
   publish_date: string
   notes: string
   archived: boolean
+  // Null pushed here leaves the stored doc as it is, so a device on an
+  // older version, which sends no doc_id, can't wipe a link. The app never
+  // clears one, only replaces it.
+  doc_id: string | null
   deleted: boolean
   edited_at: string
   // Set by the server; absent on rows being pushed.
@@ -40,6 +44,8 @@ export interface IdeaRow {
   description: string
   month: string | null
   created_at: string
+  // As on ProjectRow.
+  doc_id: string | null
   deleted: boolean
   edited_at: string
   updated_at?: string
@@ -69,6 +75,7 @@ export function projectToRow(project: Project, editedAt: string, deleted: boolea
     publish_date: project.publishDate,
     notes: project.notes,
     archived: project.archived,
+    doc_id: project.docId ?? null,
     deleted,
     edited_at: editedAt,
   }
@@ -83,6 +90,7 @@ export function rowToProject(row: ProjectRow): Project {
     publishDate: row.publish_date,
     notes: row.notes,
     archived: row.archived,
+    ...(row.doc_id ? { docId: row.doc_id } : {}),
   }
 }
 
@@ -124,6 +132,7 @@ export function ideaToRow(idea: Idea, editedAt: string, deleted: boolean): IdeaR
     description: idea.description,
     month: idea.month ?? null,
     created_at: idea.createdAt,
+    doc_id: idea.docId ?? null,
     deleted,
     edited_at: editedAt,
   }
@@ -137,5 +146,6 @@ export function rowToIdea(row: IdeaRow): Idea {
     description: row.description,
     ...(row.month ? { month: row.month } : {}),
     createdAt: row.created_at,
+    ...(row.doc_id ? { docId: row.doc_id } : {}),
   }
 }

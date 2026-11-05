@@ -1,5 +1,6 @@
 import { isColorId } from '../lib/colors'
 import { isISODate, todayISO } from '../lib/dates'
+import { isDocId } from '../lib/googleDocs'
 import { isISOMonth } from '../lib/ideas'
 import { PLATFORMS } from '../lib/platforms'
 import type { Idea, Project, Subtask, SubtaskKind } from '../types'
@@ -10,8 +11,9 @@ const APP_ID = 'content-tracker'
 
 // Bump when the stored shape changes, and teach parseBackup to upgrade
 // files written by older versions. Version 2 added ideas; version 3,
-// clean-up tasks (which an older app would read as damaged).
-export const BACKUP_SCHEMA_VERSION = 3
+// clean-up tasks (which an older app would read as damaged); version 4,
+// the Google Doc on projects and ideas (which an older app would drop).
+export const BACKUP_SCHEMA_VERSION = 4
 
 export interface Backup {
   app: typeof APP_ID
@@ -94,7 +96,7 @@ export function parseBackup(text: string): ParsedBackup {
     throw new BackupError("This file isn't a Content Tracker backup.")
   }
   const version = data.schemaVersion
-  if (version !== 1 && version !== 2 && version !== BACKUP_SCHEMA_VERSION) {
+  if (version !== 1 && version !== 2 && version !== 3 && version !== BACKUP_SCHEMA_VERSION) {
     throw new BackupError(
       `This backup uses format version ${String(version)}, which this version of the app can't read.`,
     )
@@ -123,7 +125,7 @@ const SUBTASK_KINDS: readonly SubtaskKind[] = ['task', 'publish', 'cleanup']
 function parseProject(value: unknown, index: number): Project {
   const where = `project ${index + 1}`
   if (!isRecord(value)) damaged(where)
-  const { id, title, platform, color, publishDate, notes, archived } = value
+  const { id, title, platform, color, publishDate, notes, archived, docId } = value
   if (typeof id !== 'string' || !id) damaged(`${where}: id`)
   if (typeof title !== 'string') damaged(`${where}: title`)
   if (!isOneOf(platform, PLATFORMS)) damaged(`${where}: platform`)
@@ -131,7 +133,8 @@ function parseProject(value: unknown, index: number): Project {
   if (!isISODate(publishDate)) damaged(`${where}: publish date`)
   if (typeof notes !== 'string') damaged(`${where}: notes`)
   if (typeof archived !== 'boolean') damaged(`${where}: archived`)
-  return { id, title, platform, color, publishDate, notes, archived }
+  if (docId !== undefined && !isDocId(docId)) damaged(`${where}: Google Doc`)
+  return { id, title, platform, color, publishDate, notes, archived, ...(docId === undefined ? {} : { docId }) }
 }
 
 function parseSubtask(value: unknown, index: number): Subtask {
@@ -155,7 +158,7 @@ function parseSubtask(value: unknown, index: number): Subtask {
 function parseIdea(value: unknown, index: number): Idea {
   const where = `idea ${index + 1}`
   if (!isRecord(value)) damaged(where)
-  const { id, title, platform, description, month, createdAt } = value
+  const { id, title, platform, description, month, createdAt, docId } = value
   if (typeof id !== 'string' || !id) damaged(`${where}: id`)
   if (typeof title !== 'string') damaged(`${where}: title`)
   if (!isOneOf(platform, PLATFORMS)) damaged(`${where}: platform`)
@@ -164,7 +167,16 @@ function parseIdea(value: unknown, index: number): Idea {
   if (typeof createdAt !== 'string' || Number.isNaN(Date.parse(createdAt))) {
     damaged(`${where}: date added`)
   }
-  return { id, title, platform, description, ...(month === undefined ? {} : { month }), createdAt }
+  if (docId !== undefined && !isDocId(docId)) damaged(`${where}: Google Doc`)
+  return {
+    id,
+    title,
+    platform,
+    description,
+    ...(month === undefined ? {} : { month }),
+    createdAt,
+    ...(docId === undefined ? {} : { docId }),
+  }
 }
 
 function checkConsistency(projects: Project[], subtasks: Subtask[]): void {

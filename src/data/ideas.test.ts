@@ -9,6 +9,7 @@ import {
   getSubtasks,
   getTrackerData,
   makeProjectFromIdea,
+  setIdeaDoc,
   updateIdea,
 } from '.'
 
@@ -82,6 +83,29 @@ describe('making a project from an idea', () => {
       'Publish',
     ])
     expect(await getIdeas()).toEqual([])
+  })
+
+  it('carries the idea’s Google Doc over to the project', async () => {
+    const ideaId = await addIdea({ title: 'Studio tour', platform: 'youtube', description: 'Shelves' })
+    await setIdeaDoc(ideaId, '1aBc-D_2')
+    const projectId = await makeProjectFromIdea(ideaId, {
+      title: 'Studio tour',
+      platform: 'youtube',
+      publishDate: '2027-03-20',
+      withDefaultSubtasks: false,
+    })
+    expect((await getProject(projectId))?.docId).toBe('1aBc-D_2')
+  })
+
+  it('makes a project with no doc from an idea with none', async () => {
+    const ideaId = await addIdea({ title: 'Studio tour', platform: 'youtube' })
+    const projectId = await makeProjectFromIdea(ideaId, {
+      title: 'Studio tour',
+      platform: 'youtube',
+      publishDate: '2027-03-20',
+      withDefaultSubtasks: false,
+    })
+    expect(await getProject(projectId)).not.toHaveProperty('docId')
   })
 
   it('takes a free color, not one an active project uses', async () => {

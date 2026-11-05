@@ -2,7 +2,8 @@ import type { IdeaRow, ProjectRow, Rows, SubtaskRow, SyncServer } from './remote
 
 // An in-memory stand-in for the Supabase side of sync, for tests. It follows
 // the same rules as supabase/migrations: the newer edit of each record wins,
-// and updated_at is stamped by the server and only moves forward.
+// a row pushed without a doc_id keeps the stored one, and updated_at is
+// stamped by the server and only moves forward.
 export class FakeSyncServer implements SyncServer {
   projects = new Map<string, ProjectRow>()
   subtasks = new Map<string, SubtaskRow>()
@@ -51,14 +52,19 @@ export class FakeSyncServer implements SyncServer {
     this.announce()
   }
 
-  private store<T extends { id: string; edited_at: string; updated_at?: string }>(
+  private store<T extends { id: string; edited_at: string; updated_at?: string; doc_id?: string | null }>(
     rows: Map<string, T>,
     row: T,
   ): void {
     const existing = rows.get(row.id)
     if (existing && existing.edited_at >= row.edited_at) return
     this.clock += 1000
-    rows.set(row.id, { ...row, updated_at: new Date(this.clock).toISOString() })
+    const docId = row.doc_id ?? existing?.doc_id
+    rows.set(row.id, {
+      ...row,
+      ...(docId === undefined ? {} : { doc_id: docId }),
+      updated_at: new Date(this.clock).toISOString(),
+    })
   }
 
   private announce(): void {

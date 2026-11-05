@@ -23,6 +23,8 @@ export interface Project {
   publishDate: ISODate
   notes: string
   archived: boolean
+  // The Google Doc made from it (a Drive file id); absent until one is made.
+  docId?: string
 }
 
 // Every project has exactly one 'publish' subtask, sitting on its publish
@@ -59,4 +61,6 @@ export interface Idea {
   month?: ISOMonth
   // When it was added (an ISO time), for ordering within a month.
   createdAt: string
+  // The Google Doc made from it (a Drive file id); absent until one is made.
+  docId?: string
 }

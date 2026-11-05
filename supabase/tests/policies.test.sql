@@ -79,6 +79,14 @@ language sql as $$
   ))
 $$;
 
+-- A pushed row with its doc_id set to `doc` (a JSON null when null). The
+-- helpers above send rows without doc_id, as the previous version of the
+-- app does.
+create function test.with_doc(rows jsonb, doc text) returns jsonb
+language sql as $$
+  select jsonb_build_array((rows -> 0) || jsonb_build_object('doc_id', doc))
+$$;
+
 -- Alice --------------------------------------------------------------------
 
 select test.sign_in('a0000000-0000-4000-8000-000000000001', 'alice@example.com');
@@ -122,6 +130,32 @@ select test.expect(
 select public.sync_push(test.project('Vlog v2', '2026-10-27T11:00:00Z'), null);
 select test.expect((select title = 'Vlog v2' from public.projects), 'a newer edit is applied');
 
+select test.expect((select doc_id is null from public.projects), 'a project starts with no Google Doc');
+select public.sync_push(test.with_doc(test.project('Vlog v2', '2026-10-27T11:10:00Z'), '1aB-c_D2'), null);
+select test.expect((select doc_id = '1aB-c_D2' from public.projects), 'a project''s Google Doc is stored');
+select public.sync_push(test.project('Vlog v3', '2026-10-27T11:20:00Z'), null);
+select test.expect(
+  (select title = 'Vlog v3' and doc_id = '1aB-c_D2' from public.projects),
+  'an edit from the previous version of the app, without doc_id, keeps the doc'
+);
+select public.sync_push(test.with_doc(test.project('Vlog v2', '2026-10-27T11:30:00Z'), null), null);
+select test.expect(
+  (select title = 'Vlog v2' and doc_id = '1aB-c_D2' from public.projects),
+  'an edit with a null doc_id keeps the doc'
+);
+select public.sync_push(test.with_doc(test.project('Vlog v2', '2026-10-27T11:40:00Z'), '2nd_copy'), null);
+select test.expect((select doc_id = '2nd_copy' from public.projects), 'a new copy replaces the doc');
+select public.sync_push(test.with_doc(test.project('Vlog v2', '2026-10-27T11:45:00Z'), 'old_copy'), null);
+select public.sync_push(test.with_doc(test.project('Vlog v2', '2026-10-27T11:44:00Z'), 'older_copy'), null);
+select test.expect(
+  (select doc_id = 'old_copy' from public.projects),
+  'an older edit does not bring back an older doc'
+);
+select test.expect_error(
+  $$select public.sync_push(test.with_doc(test.project('Vlog v2', '2026-10-27T11:50:00Z'), 'https://example.com/x'), null)$$,
+  'a doc_id that isn''t a Drive file id is refused'
+);
+
 select public.sync_push(test.project('Vlog v2', '2026-10-27T12:00:00Z', true), null);
 select test.expect((select deleted from public.projects), 'a delete arrives as a tombstone');
 select test.expect(
@@ -142,6 +176,17 @@ select test.expect(
 select test.expect_error(
   $$select public.sync_push(null, null, test.idea('Reel idea', '2026-10-28T11:00:00Z', month => 'March 2027'))$$,
   'an idea''s month must be YYYY-MM'
+);
+select public.sync_push(null, null, test.with_doc(test.idea('Reel idea', '2026-10-28T11:10:00Z', month => '2027-03'), 'idea_doc'));
+select test.expect((select doc_id = 'idea_doc' from public.ideas), 'an idea''s Google Doc is stored');
+select public.sync_push(null, null, test.idea('Reel idea', '2026-10-28T11:20:00Z', month => '2027-04'));
+select test.expect(
+  (select month = '2027-04' and doc_id = 'idea_doc' from public.ideas),
+  'an idea edit without doc_id keeps the doc'
+);
+select test.expect_error(
+  $$select public.sync_push(null, null, test.with_doc(test.idea('Reel idea', '2026-10-28T11:30:00Z'), ''))$$,
+  'an empty doc_id is refused'
 );
 select public.sync_push(null, null, test.idea('Reel idea', '2026-10-28T12:00:00Z', true));
 select test.expect((select deleted from public.ideas), 'a deleted idea arrives as a tombstone');

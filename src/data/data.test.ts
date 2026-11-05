@@ -17,7 +17,9 @@ import {
   moveSubtask,
   restoreProject,
   setCleanup,
+  setIdeaDoc,
   setProjectColor,
+  setProjectDoc,
   setPublishDate,
   shiftProject,
   updateSubtask,
@@ -304,14 +306,13 @@ describe('backup', () => {
 
   it('refuses files from a newer version of the app', async () => {
     const backup = JSON.parse(await exportBackupText())
-    backup.schemaVersion = 4
-    await expect(importBackupText(JSON.stringify(backup))).rejects.toThrow(/version 4/)
+    backup.schemaVersion = 5
+    await expect(importBackupText(JSON.stringify(backup))).rejects.toThrow(/version 5/)
   })
 
   it('round-trips clean-up tasks, and still imports a version 2 file', async () => {
     const id = await newProject({ withDefaultCleanup: true })
     const text = await exportBackupText()
-    expect(JSON.parse(text).schemaVersion).toBe(3)
     await clearAllData()
     await importBackupText(text)
     expect((await getSubtasks(id)).filter((s) => s.kind === 'cleanup')).toHaveLength(2)
@@ -321,6 +322,54 @@ describe('backup', () => {
     v2.subtasks = v2.subtasks.filter((s: { kind: string }) => s.kind !== 'cleanup')
     await importBackupText(JSON.stringify(v2))
     expect(await getSubtasks(id)).toHaveLength(6)
+  })
+
+  it('round-trips Google Docs as version 4, and still imports a version 3 file', async () => {
+    const projectId = await newProject()
+    const ideaId = await addIdea({ title: 'Studio tour', platform: 'youtube' })
+    await setProjectDoc(projectId, '1aBc-D_2')
+    await setIdeaDoc(ideaId, '9zY_x-8')
+    const text = await exportBackupText()
+    expect(JSON.parse(text).schemaVersion).toBe(4)
+    await clearAllData()
+    await importBackupText(text)
+    expect((await getProject(projectId))?.docId).toBe('1aBc-D_2')
+    expect((await getIdeas())[0].docId).toBe('9zY_x-8')
+
+    const v3 = JSON.parse(text)
+    v3.schemaVersion = 3
+    delete v3.projects[0].docId
+    delete v3.ideas[0].docId
+    await importBackupText(JSON.stringify(v3))
+    expect(await getProject(projectId)).not.toHaveProperty('docId')
+    expect((await getIdeas())[0]).not.toHaveProperty('docId')
+  })
+
+  it('rejects a Google Doc that isn’t a Drive file id', async () => {
+    await setProjectDoc(await newProject(), '1aBc-D_2')
+    const backup = JSON.parse(await exportBackupText())
+    backup.projects[0].docId = 'https://example.com/elsewhere'
+    await expect(importBackupText(JSON.stringify(backup))).rejects.toThrow(/project 1: Google Doc/)
+    expect((await getTrackerData()).projects[0].docId).toBe('1aBc-D_2')
+  })
+})
+
+describe('Google Docs', () => {
+  it('a project remembers its doc, and a new copy replaces it', async () => {
+    const id = await newProject()
+    expect(await getProject(id)).not.toHaveProperty('docId')
+    await setProjectDoc(id, 'first_doc')
+    await setProjectDoc(id, 'second-doc')
+    expect((await getProject(id))?.docId).toBe('second-doc')
+  })
+
+  it('refuses something that isn’t a Drive file id', async () => {
+    const id = await newProject()
+    await expect(setProjectDoc(id, '')).rejects.toThrow()
+    await expect(setProjectDoc(id, '../elsewhere')).rejects.toThrow()
+    const ideaId = await addIdea({ title: 'Studio tour', platform: 'youtube' })
+    await expect(setIdeaDoc(ideaId, 'a b')).rejects.toThrow()
+    expect(await getProject(id)).not.toHaveProperty('docId')
   })
 })
 
